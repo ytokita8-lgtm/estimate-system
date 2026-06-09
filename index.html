@@ -71,6 +71,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 .step-item.active{background:var(--navy);color:white;}
 .step-item.done{background:var(--green-bg);color:var(--green);}
 .step-item.inactive{background:var(--white);color:var(--gray3);}
+.step-item.inactive:hover{background:var(--gray1);color:var(--gray4);}
 .step-item.active::after{
   content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
   width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;
@@ -332,7 +333,6 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 <!-- ════ MAIN ════ -->
 <div class="main">
 
-  <!-- STEP NAV -->
   <div class="step-nav">
     <div class="step-item active" id="sn-0" onclick="goStep(0)">
       <div class="si-num">01</div><div class="si-icon">🏠</div><div class="si-label">住所・<br>都市計画</div>
@@ -959,13 +959,26 @@ const S = {
 // STEP NAVIGATION
 // ════════════════════════════════════════
 function goStep(n) {
+  // 現在のステップを非表示
   document.getElementById('step-' + S.step).style.display = 'none';
+  // 地盤カードも非表示（STEP0専用の独立div）
+  const jibanCard = document.getElementById('step-0-jiban');
+  if (jibanCard) jibanCard.style.display = 'none';
+
   document.getElementById('step-' + n).style.display = 'block';
   for (let i = 0; i < 5; i++) {
     const el = document.getElementById('sn-' + i);
     el.className = 'step-item ' + (i === n ? 'active' : i < n ? 'done' : 'inactive');
   }
   S.step = n;
+  // STEP0に戻った場合、地盤カードが取得済みなら再表示
+  if (n === 0) {
+    const jibanCard = document.getElementById('step-0-jiban');
+    const jibanResult = document.getElementById('jiban-result');
+    if (jibanCard && jibanResult && jibanResult.style.display !== 'none') {
+      jibanCard.style.display = 'block';
+    }
+  }
   if (n === 3) renderEstimate();
   if (n === 4) { renderOutputPreview(); renderMasterTable(); }
   window.scrollTo({top: 0, behavior: 'smooth'});
