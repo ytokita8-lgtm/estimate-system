@@ -357,16 +357,20 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
     <!-- 物件基本情報 -->
     <div class="card">
       <div class="card-title">📍 物件基本情報</div>
-      <div class="g2">
+      <div class="g2" style="margin-bottom:12px;">
         <div>
           <label class="f-label">物件名称</label>
           <input class="f-input" id="prop-name" placeholder="例：〇〇アパート">
         </div>
         <div>
           <label class="f-label">建設地住所</label>
-          <input class="f-input" id="prop-address" placeholder="例：宮城県仙台市太白区鹿野2丁目6-20">
+          <input class="f-input" id="prop-address" placeholder="例：宮城県仙台市太白区鹿野2丁目6-20"
+            onkeydown="if(event.key==='Enter')fetchJiban()">
         </div>
       </div>
+      <button class="btn btn-primary" onclick="fetchJiban()">
+        🌍 地盤情報を自動取得（国土地理院）
+      </button>
     </div>
 
     <!-- 都市計画情報 手動入力 -->
@@ -468,6 +472,69 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
     <div class="btn-row">
       <button class="btn btn-primary" onclick="goStep(1)">図面・写真の読込へ →</button>
     </div>
+  </div>
+
+  <!-- ════ 地盤調査カード（STEP0内・独立） ════ -->
+  <div id="step-0-jiban" style="display:none;">
+
+    <div class="card">
+      <div class="card-title">🌍 地盤情報を自動取得
+        <div class="card-sub">国土地理院 公式API（無料・登録不要）</div>
+      </div>
+
+      <!-- 結果表示エリア -->
+      <div id="jiban-loading" style="display:none;padding:16px;text-align:center;">
+        <div style="display:inline-flex;align-items:center;gap:10px;color:var(--gray4);font-size:13px;">
+          <div class="spin"></div> 国土地理院APIから地形データを取得中...
+        </div>
+      </div>
+
+      <div id="jiban-result" style="display:none;">
+        <!-- 判定結果メインカード -->
+        <div id="jiban-verdict" style="border-radius:var(--r);padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;gap:16px;">
+          <div id="jiban-verdict-icon" style="font-size:36px;flex-shrink:0;"></div>
+          <div>
+            <div id="jiban-verdict-title" style="font-size:16px;font-weight:900;margin-bottom:4px;"></div>
+            <div id="jiban-verdict-desc" style="font-size:12px;line-height:1.7;"></div>
+          </div>
+        </div>
+
+        <!-- 詳細データ -->
+        <div class="g3" style="margin-bottom:14px;">
+          <div style="background:var(--gray1);border-radius:var(--r);padding:12px;">
+            <div style="font-size:10px;color:var(--gray4);font-family:'JetBrains Mono',monospace;margin-bottom:4px;">地形分類（自然）</div>
+            <div id="jiban-landform" style="font-size:13px;font-weight:700;">―</div>
+          </div>
+          <div style="background:var(--gray1);border-radius:var(--r);padding:12px;">
+            <div style="font-size:10px;color:var(--gray4);font-family:'JetBrains Mono',monospace;margin-bottom:4px;">地形分類（人工）</div>
+            <div id="jiban-artificial" style="font-size:13px;font-weight:700;">―</div>
+          </div>
+          <div style="background:var(--gray1);border-radius:var(--r);padding:12px;">
+            <div style="font-size:10px;color:var(--gray4);font-family:'JetBrains Mono',monospace;margin-bottom:4px;">標高</div>
+            <div id="jiban-elev" style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;">―</div>
+          </div>
+        </div>
+
+        <!-- 地盤改良フラグ自動設定 -->
+        <div id="jiban-auto-set" style="display:none;margin-bottom:14px;"></div>
+
+        <!-- 地盤安心マップへのリンク -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <a id="jiban-map-link" href="#" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--navy);color:white;border-radius:var(--r2);font-size:13px;font-weight:700;text-decoration:none;">
+            🗺️ 地盤安心マップで詳細確認
+          </a>
+          <a id="jiban-support-link" href="#" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue-border);border-radius:var(--r2);font-size:13px;font-weight:700;text-decoration:none;">
+            🔍 地盤サポートマップで確認
+          </a>
+        </div>
+        <div style="font-size:10px;color:var(--gray3);margin-top:8px;">※地形分類は参考情報です。確定には専門家による地盤調査（SS試験等）が必要です。</div>
+      </div>
+
+      <div id="jiban-error" style="display:none;"></div>
+    </div>
+
   </div>
 
   <!-- ════ STEP 1: 図面・写真 ════ -->
@@ -647,6 +714,46 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
       🏺 <strong>埋蔵文化財包蔵地</strong>に指定されています。GRRシート工法を自動計上します。
     </div>
 
+    <!-- 掛け率・利益率設定 -->
+    <div class="card">
+      <div class="card-title">💹 客出し単価の計算設定
+        <div class="card-sub">原価 × 掛け率 ＝ 客出し単価</div>
+      </div>
+      <div style="background:var(--navy);border-radius:var(--r);padding:12px 16px;margin-bottom:14px;font-size:12px;color:rgba(255,255,255,.8);line-height:1.9;">
+        <span style="color:#4aba6a;font-weight:700;">原価</span>（Excelの暫定単価）
+        <span style="color:rgba(255,255,255,.4);margin:0 6px;">×</span>
+        <span style="color:#fbbf24;font-weight:700;">現場管理費</span>
+        <span style="color:rgba(255,255,255,.4);margin:0 6px;">×</span>
+        <span style="color:#fbbf24;font-weight:700;">一般管理費</span>
+        <span style="color:rgba(255,255,255,.4);margin:0 6px;">×</span>
+        <span style="color:#4aba6a;font-weight:700;">利益率</span>
+        <span style="color:rgba(255,255,255,.4);margin:0 6px;">=</span>
+        <span style="color:white;font-weight:900;">客出し単価</span>
+      </div>
+      <div class="g4">
+        <div>
+          <label class="f-label">現場管理費（%）</label>
+          <input class="f-input" type="number" id="r-kanri" value="8" min="0" max="30" step="0.5" onchange="recalc()">
+          <div class="f-note">直接工事費に対する%</div>
+        </div>
+        <div>
+          <label class="f-label">一般管理費（%）</label>
+          <input class="f-input" type="number" id="r-ippan" value="5" min="0" max="20" step="0.5" onchange="recalc()">
+          <div class="f-note">本社経費・人件費等</div>
+        </div>
+        <div>
+          <label class="f-label">利益率（%）</label>
+          <input class="f-input" type="number" id="r-rieki" value="10" min="0" max="40" step="0.5" onchange="recalc()">
+          <div class="f-note">税抜原価合計に対する%</div>
+        </div>
+        <div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:10px;color:var(--green);margin-bottom:4px;">掛け率合計（概算）</div>
+          <div style="font-size:18px;font-weight:900;color:var(--green);font-family:'JetBrains Mono',monospace;" id="r-total-rate">—</div>
+          <div style="font-size:10px;color:var(--gray4);margin-top:2px;">原価に対する倍率</div>
+        </div>
+      </div>
+    </div>
+
     <div class="btn-row-space">
       <button class="btn btn-ghost" onclick="goStep(1)">← 戻る</button>
       <button class="btn btn-primary" onclick="goStep(3)">見積確認へ →</button>
@@ -694,6 +801,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
             <div style="font-size:20px;font-weight:900;font-family:'JetBrains Mono',monospace;color:#4aba6a;" id="gs-arari-pct">—</div>
           </div>
         </div>
+        <div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.45);font-family:'JetBrains Mono',monospace;" id="gs-rate"></div>
       </div>
     </div>
 
@@ -756,12 +864,53 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
       </div>
     </div>
 
+    <!-- 単価マスター編集 -->
+    <div class="card">
+      <div class="card-title">🔧 単価マスター編集
+        <div class="card-sub">原価を直接編集 → 保存ボタンで次回も反映</div>
+      </div>
+
+      <div style="background:var(--navy);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:12px;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:12px;">
+        <span>💾 ブラウザに保存されます（このPC・このブラウザで次回も有効）</span>
+        <span id="master-saved-at" style="font-size:10px;color:rgba(255,255,255,.4);font-family:'JetBrains Mono',monospace;margin-left:auto;"></span>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="saveMaster()">💾 単価マスターを保存</button>
+        <button class="btn btn-outline" onclick="resetMaster()">↩️ 初期値に戻す</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportMasterJson()">📤 マスターをエクスポート</button>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+          📥 マスターをインポート
+          <input type="file" accept=".json" onchange="importMasterJson(this)" style="display:none;">
+        </label>
+      </div>
+
+      <div class="table-wrap">
+        <table class="est-table" id="master-table">
+          <thead>
+            <tr>
+              <th style="width:30px;">No</th>
+              <th>工種</th>
+              <th>項目名</th>
+              <th class="r" style="width:130px;">原価単価（円）<br><span style="font-size:9px;color:var(--amber);">★ここを編集</span></th>
+              <th style="width:50px;">単位</th>
+              <th class="r" style="width:100px;">掛け後単価</th>
+            </tr>
+          </thead>
+          <tbody id="master-body"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title">🔖 バージョン更新履歴</div>
       <div class="version-log">
-        <div class="vl-entry"><span class="vl-ver">v1.0.3</span><span class="vl-date">2026-06-09</span><span>鹿野二丁目67-20暫定見積Excelを原価マスターとして反映。単価・数量・工種を実務ベースに更新</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.6</span><span class="vl-date">2026-06-09</span><span>国土地理院APIで地形分類を自動取得→地盤改良要否を自動判定。地盤安心マップ・地盤サポートマップへのリンクを追加</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.5</span><span class="vl-date">2026-06-09</span><span>単価マスター編集・保存機能を追加。ブラウザに保存され次回も反映</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.4</span><span class="vl-date">2026-06-09</span><span>原価×掛け率（管理費・一般管理費・利益率）で客出し単価を自動計算する機能を追加</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.3</span><span class="vl-date">2026-06-09</span><span>鹿野二丁目67-20暫定見積Excelを原価マスターとして反映</span></div>
         <div class="vl-entry"><span class="vl-ver">v1.0.2</span><span class="vl-date">2026-06-09</span><span>都市計画を手動入力UIに変更。原価合計・粗利率サマリーを追加</span></div>
-        <div class="vl-entry"><span class="vl-ver">v1.0.0</span><span class="vl-date">2026-06-09</span><span>初版リリース。住所→都市計画・図面AI解析・見積計算・Excel/PDF出力</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.0</span><span class="vl-date">2026-06-09</span><span>初版リリース</span></div>
       </div>
       <div style="margin-top:10px;font-size:11px;color:var(--gray4);">
         次バージョン予定：v1.1.0 — 利益率設定・単価マスター編集・PDF表紙デザイン
@@ -789,7 +938,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 // ════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════
-const VERSION = "1.0.3";
+const VERSION = "1.0.6";
 document.getElementById('version-badge').textContent = 'v' + VERSION;
 
 const S = {
@@ -814,7 +963,7 @@ function goStep(n) {
   }
   S.step = n;
   if (n === 3) renderEstimate();
-  if (n === 4) renderOutputPreview();
+  if (n === 4) { renderOutputPreview(); renderMasterTable(); }
   window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
@@ -836,9 +985,188 @@ function setMode(mode) {
 }
 
 // ════════════════════════════════════════
-// STEP 0: 都市計画取得
+// 地盤情報自動取得（国土地理院 公式API）
 // ════════════════════════════════════════
-async function fetchZoning() {
+
+// 地形分類 → 地盤改良リスク判定テーブル
+const LANDFORM_RISK = {
+  // リスク高（改良ほぼ必須）
+  '谷底低地': {risk:'high', label:'⚠️ 軟弱地盤の可能性が高い', jiban:'あり'},
+  '旧河道':   {risk:'high', label:'⚠️ 旧河道・軟弱地盤', jiban:'あり'},
+  '後背湿地': {risk:'high', label:'⚠️ 後背湿地・軟弱地盤', jiban:'あり'},
+  '沼・池':   {risk:'high', label:'⚠️ 沼・池跡・要改良', jiban:'あり'},
+  '湿地':     {risk:'high', label:'⚠️ 湿地・要地盤改良', jiban:'あり'},
+  '干拓地':   {risk:'high', label:'⚠️ 干拓地・軟弱地盤', jiban:'あり'},
+  '埋立地':   {risk:'high', label:'⚠️ 埋立地・要改良', jiban:'あり'},
+  // リスク中（要確認）
+  '自然堤防': {risk:'mid', label:'△ 自然堤防・調査推奨', jiban:'不明'},
+  '扇状地':   {risk:'mid', label:'△ 扇状地・局所的に要確認', jiban:'不明'},
+  '氾濫平野': {risk:'mid', label:'△ 氾濫平野・調査推奨', jiban:'不明'},
+  '河川敷':   {risk:'mid', label:'△ 河川敷・要確認', jiban:'不明'},
+  '海岸平野': {risk:'mid', label:'△ 海岸平野・確認推奨', jiban:'不明'},
+  '砂州・砂丘':{risk:'mid', label:'△ 砂州・砂丘・確認推奨', jiban:'不明'},
+  // リスク低（概ね不要）
+  '台地':     {risk:'low', label:'✅ 台地・地盤良好の傾向', jiban:'なし'},
+  '段丘':     {risk:'low', label:'✅ 段丘・地盤良好の傾向', jiban:'なし'},
+  '丘陵':     {risk:'low', label:'✅ 丘陵・地盤良好の傾向', jiban:'なし'},
+  '山地':     {risk:'low', label:'✅ 山地・地盤良好の傾向', jiban:'なし'},
+  '山麓':     {risk:'low', label:'✅ 山麓・概ね良好', jiban:'なし'},
+};
+
+// 緯度経度 → タイルXY座標変換
+function latlngToTile(lat, lng, zoom) {
+  const x = Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
+  const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
+  return {x, y};
+}
+
+async function fetchJiban() {
+  const addr = document.getElementById('prop-address').value.trim();
+  if (!addr) { toast('先に住所を入力してください'); return; }
+
+  // カードを表示してローディング
+  document.getElementById('step-0-jiban').style.display = 'block';
+  document.getElementById('jiban-loading').style.display = 'block';
+  document.getElementById('jiban-result').style.display = 'none';
+  document.getElementById('jiban-error').style.display = 'none';
+  document.getElementById('step-0-jiban').scrollIntoView({behavior:'smooth', block:'start'});
+
+  try {
+    // ① 住所→緯度経度（国土地理院ジオコーダ）
+    const geoRes = await fetch(
+      `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(addr)}`
+    );
+    const geoData = await geoRes.json();
+    if (!geoData || geoData.length === 0) throw new Error('住所が見つかりませんでした');
+
+    const [lng, lat] = geoData[0].geometry.coordinates;
+
+    // ② 標高取得
+    let elev = '―';
+    try {
+      const elevRes = await fetch(
+        `https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lng}&lat=${lat}&outtype=JSON`
+      );
+      const elevData = await elevRes.json();
+      if (elevData.elevation !== null) elev = elevData.elevation.toFixed(1) + ' m';
+    } catch(e) {}
+
+    // ③ 地形分類（自然地形）GeoJSONタイル取得
+    const zoom = 14;
+    const tile = latlngToTile(lat, lng, zoom);
+    let landformNatural = '情報なし', landformArtificial = '情報なし';
+
+    try {
+      const lfRes1 = await fetch(
+        `https://cyberjapandata.gsi.go.jp/xyz/experimental_landformclassification1/${zoom}/${tile.x}/${tile.y}.geojson`
+      );
+      if (lfRes1.ok) {
+        const lfData1 = await lfRes1.json();
+        if (lfData1.features && lfData1.features.length > 0) {
+          const feat = lfData1.features[0];
+          landformNatural = feat.properties?.description || feat.properties?.class || '取得済';
+        }
+      }
+    } catch(e) {}
+
+    try {
+      const lfRes2 = await fetch(
+        `https://cyberjapandata.gsi.go.jp/xyz/experimental_landformclassification2/${zoom}/${tile.x}/${tile.y}.geojson`
+      );
+      if (lfRes2.ok) {
+        const lfData2 = await lfRes2.json();
+        if (lfData2.features && lfData2.features.length > 0) {
+          const feat = lfData2.features[0];
+          landformArtificial = feat.properties?.description || feat.properties?.class || '取得済';
+        }
+      }
+    } catch(e) {}
+
+    // ④ リスク判定
+    const combined = landformNatural + ' ' + landformArtificial;
+    let verdict = {risk:'unknown', label:'📋 地盤データ取得済・要専門調査', jiban:'不明'};
+    for (const [key, val] of Object.entries(LANDFORM_RISK)) {
+      if (combined.includes(key)) { verdict = val; break; }
+    }
+
+    // ⑤ 結果表示
+    document.getElementById('jiban-loading').style.display = 'none';
+    document.getElementById('jiban-result').style.display = 'block';
+    document.getElementById('jiban-landform').textContent   = landformNatural;
+    document.getElementById('jiban-artificial').textContent = landformArtificial;
+    document.getElementById('jiban-elev').textContent       = elev;
+
+    // 判定カード色
+    const vEl = document.getElementById('jiban-verdict');
+    const colors = {
+      high:    {bg:'var(--red-bg)',    border:'var(--red)',    icon:'🔴'},
+      mid:     {bg:'var(--amber-bg)',  border:'var(--amber)',  icon:'🟡'},
+      low:     {bg:'var(--green-bg)',  border:'var(--green)',  icon:'🟢'},
+      unknown: {bg:'var(--blue-bg)',   border:'var(--blue)',   icon:'🔵'},
+    };
+    const c = colors[verdict.risk] || colors.unknown;
+    vEl.style.background   = c.bg;
+    vEl.style.border       = `1.5px solid ${c.border}`;
+    document.getElementById('jiban-verdict-icon').textContent = c.icon;
+    document.getElementById('jiban-verdict-title').textContent = verdict.label;
+    document.getElementById('jiban-verdict-desc').innerHTML =
+      `地形分類：<strong>${landformNatural}</strong>（人工地形：${landformArtificial}）、標高：${elev}<br>` +
+      `取得元：国土地理院 地形分類ベクトルタイル（座標：${lat.toFixed(5)}, ${lng.toFixed(5)}）`;
+
+    // 地盤改良フラグ自動設定
+    if (verdict.jiban !== '不明') {
+      const autoEl = document.getElementById('jiban-auto-set');
+      autoEl.style.display = 'block';
+      autoEl.innerHTML = `
+        <div class="alert ${verdict.jiban==='あり'?'alert-warn':'alert-ok'}">
+          <strong>${verdict.jiban==='あり'?'⚠️ 地盤改良「あり」として見積に自動設定します':'✅ 地盤改良「なし」として見積に設定します'}</strong><br>
+          <span style="font-size:11px;">STEP03の「地盤改良」設定に反映されます。変更可能です。</span>
+          <div style="margin-top:8px;">
+            <button class="btn btn-sm ${verdict.jiban==='あり'?'btn-danger':'btn-success'}"
+              onclick="applyJibanFlag('${verdict.jiban}')">
+              ${verdict.jiban==='あり'?'⚠️ 地盤改良あり で設定':'✅ 地盤改良なし で設定'}
+            </button>
+          </div>
+        </div>`;
+    }
+
+    // 外部リンクURL設定
+    const encAddr = encodeURIComponent(addr);
+    document.getElementById('jiban-map-link').href =
+      `https://jibannet.co.jp/map/?search=${encAddr}`;
+    document.getElementById('jiban-support-link').href =
+      `https://sumaken.j-shield.co.jp/supportmap/?search=${encAddr}`;
+
+    toast('🌍 地盤情報を取得しました');
+
+  } catch(e) {
+    document.getElementById('jiban-loading').style.display = 'none';
+    document.getElementById('jiban-error').style.display = 'block';
+    document.getElementById('jiban-error').innerHTML = `
+      <div class="alert alert-err">
+        ❌ ${e.message || '地盤情報の取得に失敗しました'}<br>
+        <span style="font-size:11px;">下のボタンから手動で確認してください。</span>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+          <a href="https://jibannet.co.jp/map/" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--navy);color:white;border-radius:var(--r2);font-size:12px;font-weight:700;text-decoration:none;">
+            🗺️ 地盤安心マップを開く
+          </a>
+          <a href="https://sumaken.j-shield.co.jp/supportmap/" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);border-radius:var(--r2);font-size:12px;font-weight:700;text-decoration:none;">
+            🔍 地盤サポートマップを開く
+          </a>
+        </div>
+      </div>`;
+    toast('住所から座標を取得できませんでした');
+  }
+}
+
+function applyJibanFlag(val) {
+  // STEP03の地盤改良セレクトに反映
+  const el = document.getElementById('s-jiban');
+  if (el) { el.value = val; recalc(); }
+  toast(val === 'あり' ? '⚠️ 地盤改良「あり」を設定しました' : '✅ 地盤改良「なし」を設定しました');
+}
   const addr = document.getElementById('prop-address').value.trim();
   if (!addr) { toast('住所を入力してください'); return; }
 
@@ -1128,6 +1456,14 @@ function recalc() {
   const k = parseInt(document.getElementById('s-kaisu').value) || 2;
   document.getElementById('s-nm2').value = (nb * 3.30579).toFixed(1);
   document.getElementById('s-gh').value = (gm * (k === 2 ? 7 : 9.5)).toFixed(1);
+
+  // 掛け率合計表示
+  const kanri = parseFloat(document.getElementById('r-kanri')?.value || 8) / 100;
+  const ippan = parseFloat(document.getElementById('r-ippan')?.value || 5) / 100;
+  const rieki = parseFloat(document.getElementById('r-rieki')?.value || 10) / 100;
+  const rate = (1 + kanri) * (1 + ippan) * (1 + rieki);
+  const el = document.getElementById('r-total-rate');
+  if (el) el.textContent = rate.toFixed(3) + ' 倍';
 }
 
 function getParams() {
@@ -1160,6 +1496,10 @@ function getParams() {
     ac:      parseInt(v('s-ac').value) || 0,
     junboka: S.specFlags.junboka,
     maizo:   S.specFlags.maizo,
+    // 掛け率設定
+    kanri:   parseFloat(v('r-kanri')?.value || 8) / 100,
+    ippan:   parseFloat(v('r-ippan')?.value || 5) / 100,
+    rieki:   parseFloat(v('r-rieki')?.value || 10) / 100,
   };
 }
 
@@ -1288,16 +1628,27 @@ function calcEstimate(p) {
     rows.push({cat:'特殊仕様', name:'GRRシート工法（埋蔵文化財対応）', basis:'埋蔵文化財包蔵地', qty:p.bm, unit:'坪', tanka:15000, genka:11700});
   }
 
-  const computed = rows.map(r => ({
-    ...r,
-    qty:  Math.round((r.qty||0)*100)/100,
-    kin:  Math.round((r.qty||0)*(r.tanka||0)),
-    gkin: Math.round((r.qty||0)*(r.genka||0)),
-  }));
+  // 掛け率で客出し単価を計算
+  // genkaをMASTERから上書き（localStorage保存値を反映）
+  const rate = (1 + p.kanri) * (1 + p.ippan) * (1 + p.rieki);
+  const computed = rows.map(r => {
+    const masterItem = MASTER.find(m => m.cat === r.cat && m.name === r.name);
+    const genka = masterItem ? masterItem.genka : (r.genka || 0);
+    const tanka = Math.ceil((genka * rate) / 100) * 100;
+    const qty   = Math.round((r.qty||0)*100)/100;
+    return {
+      ...r,
+      genka,
+      tanka,
+      qty,
+      kin:  Math.round(qty * tanka),
+      gkin: Math.round(qty * genka),
+    };
+  });
 
-  const chokku = computed.reduce((s,r)=>s+r.kin,0);
+  const chokku  = computed.reduce((s,r)=>s+r.kin,0);
   const gChokku = computed.reduce((s,r)=>s+r.gkin,0);
-  return { rows: computed, chokku, gChokku };
+  return { rows: computed, chokku, gChokku, rate };
 }
 
 // ════════════════════════════════════════
@@ -1305,8 +1656,8 @@ function calcEstimate(p) {
 // ════════════════════════════════════════
 function renderEstimate() {
   const p = getParams();
-  const { rows, chokku, gChokku } = calcEstimate(p);
-  S.estimate = { rows, chokku, gChokku, p };
+  const { rows, chokku, gChokku, rate } = calcEstimate(p);
+  S.estimate = { rows, chokku, gChokku, p, rate };
 
   const fmt = n => Math.round(n).toLocaleString('ja-JP');
   const tax = Math.round(chokku * 0.1);
@@ -1330,6 +1681,9 @@ function renderEstimate() {
     document.getElementById('gs-genka').textContent  = '¥' + fmt(gChokku);
     document.getElementById('gs-arari').textContent  = '¥' + fmt(arari);
     document.getElementById('gs-arari-pct').textContent = arariPct + '%';
+    // 掛け率情報
+    const rateEl = document.getElementById('gs-rate');
+    if (rateEl) rateEl.textContent = `掛け率 ${rate.toFixed(3)}倍（管理${(p.kanri*100).toFixed(1)}% × 一般${(p.ippan*100).toFixed(1)}% × 利益${(p.rieki*100).toFixed(1)}%）`;
   }
 
   // テーブル描画
@@ -1631,6 +1985,10 @@ function loadJson(input) {
         setV('s-kw', p.kw); setV('s-ts', p.ts); setV('s-bw', p.bw);
         setV('s-cl', p.cl); setV('s-dn', p.dn); setV('s-sdn', p.sdn);
         setV('s-tl', p.tl); setV('s-ac', p.ac);
+        // 掛け率設定の復元
+        if (p.kanri !== undefined) setV('r-kanri', Math.round(p.kanri*100));
+        if (p.ippan !== undefined) setV('r-ippan', Math.round(p.ippan*100));
+        if (p.rieki !== undefined) setV('r-rieki', Math.round(p.rieki*100));
       }
       if (data.specFlags) { S.specFlags = data.specFlags; updateAlerts(); }
       if (data.zoning) { S.zoning = data.zoning; showZoningResult(data.zoning); document.getElementById('zone-result-area').style.display='block'; }
@@ -1672,9 +2030,236 @@ function toast(msg) {
 }
 
 // ════════════════════════════════════════
+// 単価マスター管理（localStorage永続化）
+// ════════════════════════════════════════
+const MASTER_KEY = 'estimate_genka_master_v1';
+
+// デフォルト原価マスター（calcEstimateと同期）
+const DEFAULT_MASTER = [
+  {cat:'仮設・共通',   name:'仮設足場',              unit:'㎡',   genka:620},
+  {cat:'仮設・共通',   name:'共通仮設費用',           unit:'式',   genka:380000},
+  {cat:'仮設・共通',   name:'完成後クリーニング',     unit:'㎡',   genka:300},
+  {cat:'仮設・共通',   name:'外部借上駐車場',         unit:'式',   genka:800000},
+  {cat:'仮設・共通',   name:'産廃',                   unit:'坪',   genka:7000},
+  {cat:'基礎・地盤',   name:'基礎工事（3階建）',      unit:'坪',   genka:62000},
+  {cat:'基礎・地盤',   name:'地盤改良',               unit:'式',   genka:1200000},
+  {cat:'構造・木工事', name:'建て方（在来）',          unit:'坪',   genka:8000},
+  {cat:'構造・木工事', name:'木材（在来）',            unit:'坪',   genka:58000},
+  {cat:'構造・木工事', name:'防水材・点検口',          unit:'式',   genka:230000},
+  {cat:'構造・木工事', name:'内部造作（在来）',        unit:'坪',   genka:24000},
+  {cat:'構造・木工事', name:'共用部造作',              unit:'式',   genka:380000},
+  {cat:'設備',         name:'換気材',                  unit:'部屋', genka:14000},
+  {cat:'設備',         name:'電気配線工事',            unit:'部屋', genka:280000},
+  {cat:'設備',         name:'給排水工事',              unit:'部屋', genka:390000},
+  {cat:'設備',         name:'室外物干し',              unit:'部屋', genka:7200},
+  {cat:'設備',         name:'室内物干し',              unit:'部屋', genka:5000},
+  {cat:'設備',         name:'火災報知器',              unit:'部屋', genka:3000},
+  {cat:'設備',         name:'非常照明・消火器等',      unit:'式',   genka:78000},
+  {cat:'設備',         name:'給湯器',                  unit:'部屋', genka:48000},
+  {cat:'設備',         name:'ガス工事（プロパン）',    unit:'部屋', genka:26000},
+  {cat:'設備',         name:'ガス工事（都市ガス）',    unit:'部屋', genka:130000},
+  {cat:'断熱材',       name:'各階外周部断熱材',        unit:'本',   genka:4000},
+  {cat:'断熱材',       name:'界壁断熱材',              unit:'本',   genka:5000},
+  {cat:'断熱材',       name:'各階天井断熱材',          unit:'本',   genka:4000},
+  {cat:'石膏ボード',   name:'外周部石膏ボード（3F）',  unit:'枚',   genka:1150},
+  {cat:'石膏ボード',   name:'界壁石膏ボード',          unit:'枚',   genka:560},
+  {cat:'石膏ボード',   name:'1F天井石膏ボード（3F）',  unit:'枚',   genka:850},
+  {cat:'石膏ボード',   name:'2F天井石膏ボード（3F）',  unit:'枚',   genka:850},
+  {cat:'石膏ボード',   name:'3F天井石膏ボード',        unit:'枚',   genka:420},
+  {cat:'石膏ボード',   name:'間仕切り石膏ボード（3F）',unit:'枚',   genka:1150},
+  {cat:'石膏ボード',   name:'遮音シート',              unit:'本',   genka:2050},
+  {cat:'床材',         name:'ユカテック（2・3F）',     unit:'枚',   genka:2150},
+  {cat:'床材',         name:'スーパーハード（2・3F）', unit:'枚',   genka:1150},
+  {cat:'床材',         name:'壁下地・床下地',          unit:'部屋', genka:31000},
+  {cat:'床材',         name:'フローリング',            unit:'㎡',   genka:1700},
+  {cat:'床材',         name:'クッションフロア',        unit:'㎡',   genka:2700},
+  {cat:'内装仕上',     name:'壁クロス',                unit:'㎡',   genka:820},
+  {cat:'内装仕上',     name:'天井クロス',              unit:'㎡',   genka:820},
+  {cat:'内装仕上',     name:'造作部材',                unit:'部屋', genka:31000},
+  {cat:'内装仕上',     name:'内部コーキング',          unit:'部屋', genka:15500},
+  {cat:'内装仕上',     name:'玄関タイル工事',          unit:'部屋', genka:12400},
+  {cat:'内装仕上',     name:'コートかけ・傘掛け等',    unit:'部屋', genka:15500},
+  {cat:'内装仕上',     name:'リペア',                  unit:'棟',   genka:78000},
+  {cat:'内装仕上',     name:'共用部長尺シート貼り',    unit:'㎡',   genka:2700},
+  {cat:'建具・サッシ', name:'開き戸（D）',             unit:'箇所', genka:14800},
+  {cat:'建具・サッシ', name:'引き戸（SD）',            unit:'箇所', genka:21000},
+  {cat:'建具・サッシ', name:'3本引き戸',               unit:'箇所', genka:78000},
+  {cat:'建具・サッシ', name:'折れ戸（CL）',            unit:'箇所', genka:19500},
+  {cat:'建具・サッシ', name:'靴箱',                    unit:'箇所', genka:23000},
+  {cat:'建具・サッシ', name:'クローゼット枕棚',        unit:'箇所', genka:7000},
+  {cat:'建具・サッシ', name:'各部屋玄関ドア（防火）',  unit:'箇所', genka:97000},
+  {cat:'建具・サッシ', name:'共用部ドア（防火）',      unit:'箇所', genka:360000},
+  {cat:'建具・サッシ', name:'腰窓（防火）',            unit:'箇所', genka:58000},
+  {cat:'建具・サッシ', name:'縦滑り窓（防火）',        unit:'箇所', genka:43000},
+  {cat:'建具・サッシ', name:'バルコニー窓（防火）',    unit:'箇所', genka:124000},
+  {cat:'建具・サッシ', name:'カーテンレール2m',        unit:'箇所', genka:1700},
+  {cat:'建具・サッシ', name:'カーテンレール1m',        unit:'箇所', genka:1300},
+  {cat:'住設機器',     name:'トイレ',                  unit:'箇所', genka:41000},
+  {cat:'住設機器',     name:'トイレ収納',              unit:'箇所', genka:10900},
+  {cat:'住設機器',     name:'タオルリング+紙巻器',     unit:'箇所', genka:7800},
+  {cat:'住設機器',     name:'洗面台W600',              unit:'箇所', genka:49000},
+  {cat:'住設機器',     name:'洗濯パン600サイズ',       unit:'箇所', genka:7800},
+  {cat:'住設機器',     name:'キッチン1800（対面）',    unit:'箇所', genka:148000},
+  {cat:'住設機器',     name:'キッチン配送費',          unit:'棟',   genka:20000},
+  {cat:'住設機器',     name:'IHクッキングヒーター',    unit:'箇所', genka:42000},
+  {cat:'住設機器',     name:'ユニットバス1216',        unit:'箇所', genka:156000},
+  {cat:'住設機器',     name:'ユニットバス配送費',      unit:'棟',   genka:22500},
+  {cat:'照明・エアコン',name:'照明器具（1LDK）',       unit:'部屋', genka:46000},
+  {cat:'照明・エアコン',name:'共用部照明',             unit:'棟',   genka:78000},
+  {cat:'照明・エアコン',name:'外部鉄骨階段',           unit:'棟',   genka:940000},
+  {cat:'照明・エアコン',name:'外部鉄骨階段塗装',       unit:'棟',   genka:156000},
+  {cat:'照明・エアコン',name:'エアコン2.8kw',          unit:'台',   genka:55000},
+  {cat:'照明・エアコン',name:'エアコン取付費',         unit:'台',   genka:31000},
+  {cat:'外装・屋根',   name:'屋根工事',                unit:'㎡',   genka:6800},
+  {cat:'外装・屋根',   name:'外壁工事',                unit:'㎡',   genka:5000},
+  {cat:'外装・屋根',   name:'軒天材',                  unit:'㎡',   genka:4000},
+  {cat:'外装・屋根',   name:'基礎左官',                unit:'m',    genka:1000},
+  {cat:'セキュリティ', name:'オートロック',             unit:'棟',   genka:214000},
+  {cat:'セキュリティ', name:'インターホン（対応）',     unit:'部屋', genka:23400},
+  {cat:'セキュリティ', name:'サイン工事',              unit:'棟',   genka:156000},
+  {cat:'特殊仕様',     name:'GRRシート工法（埋蔵文化財対応）', unit:'坪', genka:11700},
+];
+
+// 現在のマスターデータ（起動時にlocalStorageから復元）
+let MASTER = JSON.parse(JSON.stringify(DEFAULT_MASTER));
+
+function loadMasterFromStorage() {
+  try {
+    const saved = localStorage.getItem(MASTER_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      if (data.items && Array.isArray(data.items)) {
+        // 保存済みデータをDEFAULT_MASTERにマージ（新項目は追加、既存は上書き）
+        MASTER = DEFAULT_MASTER.map(def => {
+          const saved_item = data.items.find(s => s.name === def.name && s.cat === def.cat);
+          return saved_item ? {...def, genka: saved_item.genka} : def;
+        });
+        const el = document.getElementById('master-saved-at');
+        if (el) el.textContent = '最終保存: ' + new Date(data.savedAt).toLocaleString('ja-JP');
+      }
+    }
+  } catch(e) { console.warn('マスター読込エラー', e); }
+}
+
+function saveMaster() {
+  // テーブルの入力値を収集
+  const rows = document.querySelectorAll('#master-body tr[data-idx]');
+  rows.forEach(tr => {
+    const idx = parseInt(tr.dataset.idx);
+    const inp = tr.querySelector('.master-genka-input');
+    if (inp && MASTER[idx]) {
+      MASTER[idx].genka = parseInt(inp.value.replace(/,/g,'')) || MASTER[idx].genka;
+    }
+  });
+  const saveData = { savedAt: new Date().toISOString(), version: VERSION, items: MASTER };
+  localStorage.setItem(MASTER_KEY, JSON.stringify(saveData));
+  const el = document.getElementById('master-saved-at');
+  if (el) el.textContent = '最終保存: ' + new Date().toLocaleString('ja-JP');
+  toast('💾 単価マスターを保存しました');
+  renderMasterTable(); // 表示更新
+}
+
+function resetMaster() {
+  if (!confirm('単価マスターを初期値に戻します。よろしいですか？')) return;
+  localStorage.removeItem(MASTER_KEY);
+  MASTER = JSON.parse(JSON.stringify(DEFAULT_MASTER));
+  renderMasterTable();
+  toast('↩️ 初期値に戻しました');
+}
+
+function exportMasterJson() {
+  const data = { savedAt: new Date().toISOString(), version: VERSION, items: MASTER };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `単価マスター_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  toast('📤 単価マスターをエクスポートしました');
+}
+
+function importMasterJson(input) {
+  const f = input.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.items && Array.isArray(data.items)) {
+        MASTER = DEFAULT_MASTER.map(def => {
+          const imp = data.items.find(s => s.name === def.name && s.cat === def.cat);
+          return imp ? {...def, genka: imp.genka} : def;
+        });
+        renderMasterTable();
+        toast('📥 単価マスターをインポートしました');
+      }
+    } catch(e) { toast('読込に失敗しました'); }
+  };
+  reader.readAsText(f);
+}
+
+function getMasterGenka(cat, name) {
+  const item = MASTER.find(m => m.cat === cat && m.name === name);
+  return item ? item.genka : null;
+}
+
+function renderMasterTable() {
+  const kanri = parseFloat(document.getElementById('r-kanri')?.value || 8) / 100;
+  const ippan = parseFloat(document.getElementById('r-ippan')?.value || 5) / 100;
+  const rieki = parseFloat(document.getElementById('r-rieki')?.value || 10) / 100;
+  const rate  = (1 + kanri) * (1 + ippan) * (1 + rieki);
+  const fmt   = n => Math.round(n).toLocaleString('ja-JP');
+
+  const tbody = document.getElementById('master-body');
+  if (!tbody) return;
+
+  let html = '', lastCat = '';
+  MASTER.forEach((item, idx) => {
+    if (item.cat !== lastCat) {
+      html += `<tr style="background:var(--navy-light);"><td colspan="6" style="font-weight:700;color:var(--navy);font-size:11px;padding:6px 10px;">▼ ${item.cat}</td></tr>`;
+      lastCat = item.cat;
+    }
+    const tanka = Math.ceil((item.genka * rate) / 100) * 100;
+    const isChanged = item.genka !== DEFAULT_MASTER[idx]?.genka;
+    html += `<tr data-idx="${idx}" style="background:${isChanged?'var(--amber-bg)':''}">
+      <td style="text-align:right;color:var(--gray4);">${idx+1}</td>
+      <td style="font-size:11px;color:var(--gray4);">${item.cat}</td>
+      <td>${item.name}${isChanged?'<span style="font-size:9px;color:var(--amber);margin-left:4px;">●変更済</span>':''}</td>
+      <td style="text-align:right;">
+        <input class="master-genka-input"
+          style="width:100px;font-size:12px;padding:4px 8px;border:1px solid ${isChanged?'var(--amber)':'var(--gray2)'};border-radius:4px;text-align:right;font-family:'JetBrains Mono',monospace;background:${isChanged?'var(--amber-bg)':'var(--white)'};"
+          value="${fmt(item.genka)}"
+          onchange="updateMasterRow(${idx}, this.value)"
+          onfocus="this.select()">
+      </td>
+      <td style="text-align:center;font-size:11px;">${item.unit}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--navy);font-weight:600;">¥${fmt(tanka)}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function updateMasterRow(idx, val) {
+  const num = parseInt(val.replace(/,/g,'')) || 0;
+  if (MASTER[idx]) MASTER[idx].genka = num;
+  // 掛け後単価をリアルタイム更新
+  const kanri = parseFloat(document.getElementById('r-kanri')?.value || 8) / 100;
+  const ippan = parseFloat(document.getElementById('r-ippan')?.value || 5) / 100;
+  const rieki = parseFloat(document.getElementById('r-rieki')?.value || 10) / 100;
+  const rate  = (1 + kanri) * (1 + ippan) * (1 + rieki);
+  const tanka = Math.ceil((num * rate) / 100) * 100;
+  const tr = document.querySelector(`#master-body tr[data-idx="${idx}"]`);
+  if (tr) {
+    tr.cells[5].textContent = '¥' + Math.round(tanka).toLocaleString('ja-JP');
+    tr.cells[3].querySelector('input').style.borderColor = 'var(--amber)';
+    tr.cells[3].querySelector('input').style.background = 'var(--amber-bg)';
+    tr.style.background = 'var(--amber-bg)';
+  }
+}
+
+// ════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════
 recalc();
+loadMasterFromStorage();
 </script>
 </body>
 </html>
