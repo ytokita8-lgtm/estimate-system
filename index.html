@@ -759,7 +759,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
     <div class="card">
       <div class="card-title">🔖 バージョン更新履歴</div>
       <div class="version-log">
-        <div class="vl-entry"><span class="vl-ver">v1.0.0</span><span class="vl-date">2026-06-09</span><span>初版リリース。住所→都市計画自動取得・図面AI解析・見積計算・Excel/PDF出力</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.3</span><span class="vl-date">2026-06-09</span><span>鹿野二丁目67-20暫定見積Excelを原価マスターとして反映。単価・数量・工種を実務ベースに更新</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.2</span><span class="vl-date">2026-06-09</span><span>都市計画を手動入力UIに変更。原価合計・粗利率サマリーを追加</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.0</span><span class="vl-date">2026-06-09</span><span>初版リリース。住所→都市計画・図面AI解析・見積計算・Excel/PDF出力</span></div>
       </div>
       <div style="margin-top:10px;font-size:11px;color:var(--gray4);">
         次バージョン予定：v1.1.0 — 利益率設定・単価マスター編集・PDF表紙デザイン
@@ -787,7 +789,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 // ════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════
-const VERSION = "1.0.2";
+const VERSION = "1.0.3";
 document.getElementById('version-badge').textContent = 'v' + VERSION;
 
 const S = {
@@ -1163,6 +1165,8 @@ function getParams() {
 
 // ════════════════════════════════════════
 // 見積計算エンジン
+// tanka = 客出し見積単価（暫定見積Excelより）
+// genka = 原価（仕入・外注コスト）
 // ════════════════════════════════════════
 function calcEstimate(p) {
   const h = p.heya, k = p.kaisu;
@@ -1180,92 +1184,108 @@ function calcEstimate(p) {
   const isL = p.madori === '1LDK';
   const gas170 = p.gas === '都市ガス';
 
+  // 部屋数スケール係数（暫定見積は9部屋想定なので比率で調整）
+  const hRatio = h / 9;
+  const bRatio = p.bm / 112.59;  // 暫定見積の施工面積基準
+
   const rows = [
-    {cat:'仮設・共通',  name:'仮設足場',              basis:'外周長×1.1×高さ',      qty: p.gm*1.1*(k===2?7:9.5),    unit:'㎡',   tanka:800,      genka:600},
-    {cat:'仮設・共通',  name:'共通仮設費用',           basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:500000,   genka:400000},
-    {cat:'仮設・共通',  name:'完成後クリーニング',     basis:'延床面積',              qty: nm2,                        unit:'㎡',   tanka:400,      genka:300},
-    {cat:'仮設・共通',  name:'外部借上駐車場',         basis:'1現場固定',             qty: 1,                          unit:'式',   tanka:800000,   genka:800000},
-    {cat:'仮設・共通',  name:'産廃',                   basis:'建物面積（坪）',        qty: p.bm,                       unit:'坪',   tanka:9000,     genka:7000},
-    {cat:'基礎・地盤',  name:'基礎工事',               basis:'1階面積（坪）',         qty: p.ik,                       unit:'坪',   tanka:k===2?70000:85000, genka:k===2?55000:68000},
-    {cat:'基礎・地盤',  name:'地盤改良',               basis:p.jiban==='あり'?'あり':'なし(0)', qty:p.jiban==='あり'?1:0, unit:'棟', tanka:1500000,  genka:1200000},
-    {cat:'構造・木工事',name:'建て方',                 basis:'建物面積（坪）',        qty: p.bm,                       unit:'坪',   tanka:isZ?11000:(k===3?13000:12000), genka:isZ?8500:(k===3?10000:9200)},
-    {cat:'構造・木工事',name:'木材',                   basis:'建物面積（坪）',        qty: p.bm,                       unit:'坪',   tanka:isZ?75000:86000, genka:isZ?60000:69000},
-    {cat:'構造・木工事',name:'防水材・点検口',         basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:300000,   genka:240000},
-    {cat:'構造・木工事',name:'内部造作',               basis:'延床面積（坪）',        qty: p.nb,                       unit:'坪',   tanka:isZ?33000:25000, genka:isZ?26000:20000},
-    {cat:'構造・木工事',name:'共用部造作',             basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:500000,   genka:400000},
-    {cat:'断熱材',      name:'各階外周部断熱材',       basis:'外周坪×階数÷3',        qty: gt*k/3,                     unit:'本',   tanka:5250,     genka:4200},
-    {cat:'断熱材',      name:'界壁断熱材',             basis:'界壁両面坪÷1.5',       qty: (kh/T*2)/1.5,               unit:'本',   tanka:6550,     genka:5200},
-    {cat:'断熱材',      name:'各階天井断熱材',         basis:'1F坪×階数÷3',          qty: p.ik*k/3,                   unit:'本',   tanka:5250,     genka:4200},
-    {cat:'石膏ボード',  name:'外周部石膏ボード',       basis:'外周㎡÷2.2022',        qty: gh/2.2022,                  unit:'枚',   tanka:k===2?720:1500, genka:k===2?580:1200},
-    {cat:'石膏ボード',  name:'界壁石膏ボード',         basis:'界壁両面×4÷2.2022',    qty: kh*2/2.2022*4,              unit:'枚',   tanka:720,      genka:580},
-    {cat:'石膏ボード',  name:'1F天井石膏ボード',       basis:'1F天井÷1.6562',        qty: t1/1.6562,                  unit:'枚',   tanka:k===2?1020:1100, genka:k===2?820:880},
-    {cat:'石膏ボード',  name:'2F天井石膏ボード',       basis:'2F天井÷1.6562',        qty: t2/1.6562,                  unit:'枚',   tanka:k===2?540:1100, genka:k===2?430:880},
-    ...(k===3?[{cat:'石膏ボード',name:'3F天井石膏ボード',basis:'3F天井÷1.6562',qty:t2/1.6562,unit:'枚',tanka:540,genka:430}]:[]),
-    {cat:'石膏ボード',  name:'間仕切り石膏ボード',     basis:'間仕切り÷2.2022',      qty: mj/2.2022,                  unit:'枚',   tanka:k===2?720:1500, genka:k===2?580:1200},
-    {cat:'石膏ボード',  name:'遮音シート',             basis:'界壁両面÷9.1',         qty: kh*2/9.1,                   unit:'本',   tanka:2700,     genka:2160},
-    {cat:'床材',        name:'ユカテック（2・3F）',     basis:'2・3F床÷1.10292',      qty: y2/1.10292,                 unit:'枚',   tanka:2800,     genka:2240},
-    {cat:'床材',        name:'スーパーハード（2・3F）', basis:'2・3F床÷1.6562',       qty: y2/1.6562,                  unit:'枚',   tanka:1500,     genka:1200},
-    {cat:'床材',        name:'壁下地・床下地',         basis:'部屋数',                qty: h,                          unit:'部屋', tanka:40000,    genka:32000},
-    {cat:'床材',        name:'フローリング',           basis:'延床㎡×70%',            qty: nm2*0.7,                    unit:'㎡',   tanka:2200,     genka:1760},
-    {cat:'床材',        name:'クッションフロア',       basis:'トイレ+洗面所',         qty: h*4.5,                      unit:'㎡',   tanka:3500,     genka:2800},
-    {cat:'内装仕上',    name:'壁クロス',               basis:'壁面積（周長×2.4m）',  qty: nm2/Math.max(h,1)*2.4*4,    unit:'㎡',   tanka:950,      genka:760},
-    {cat:'内装仕上',    name:'天井クロス',             basis:'延床㎡－UB分',          qty: nm2-h*1.6,                  unit:'㎡',   tanka:950,      genka:760},
-    {cat:'内装仕上',    name:'造作部材',               basis:'部屋数',                qty: h,                          unit:'部屋', tanka:40000,    genka:32000},
-    {cat:'内装仕上',    name:'内部コーキング',         basis:'部屋数',                qty: h,                          unit:'部屋', tanka:20000,    genka:16000},
-    {cat:'内装仕上',    name:'玄関タイル工事',         basis:'部屋数',                qty: h,                          unit:'部屋', tanka:16000,    genka:12800},
-    {cat:'内装仕上',    name:'コートかけ・傘掛け等',   basis:'部屋数',                qty: h,                          unit:'部屋', tanka:20000,    genka:16000},
-    {cat:'内装仕上',    name:'リペア',                 basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:100000,   genka:80000},
-    {cat:'設備',        name:'換気材',                 basis:'部屋数',                qty: h,                          unit:'部屋', tanka:19000,    genka:15200},
-    {cat:'設備',        name:'電気配線工事',           basis:'部屋数',                qty: h,                          unit:'部屋', tanka:360000,   genka:288000},
-    {cat:'設備',        name:'給排水工事',             basis:'部屋数',                qty: h,                          unit:'部屋', tanka:450000,   genka:360000},
-    {cat:'設備',        name:'給湯器',                 basis:'部屋数',                qty: h,                          unit:'部屋', tanka:63000,    genka:50400},
-    {cat:'設備',        name:'ガス工事',               basis:gas170?'都市ガス':'プロパン', qty:h,                       unit:'部屋', tanka:gas170?170000:35000, genka:gas170?136000:28000},
-    {cat:'設備',        name:'火災報知器',             basis:'部屋数',                qty: h,                          unit:'部屋', tanka:3900,     genka:3120},
-    {cat:'設備',        name:'非常照明・消火器等',     basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:100000,   genka:80000},
-    {cat:'設備',        name:'室外物干し',             basis:'部屋数',                qty: h,                          unit:'部屋', tanka:9400,     genka:7520},
-    {cat:'設備',        name:'室内物干し',             basis:'部屋数',                qty: h,                          unit:'部屋', tanka:6600,     genka:5280},
-    {cat:'住設機器',    name:'トイレ',                 basis:'箇所数',                qty: p.tl,                       unit:'箇所', tanka:53000,    genka:42400},
-    {cat:'住設機器',    name:'トイレ収納',             basis:'箇所数',                qty: p.tl,                       unit:'箇所', tanka:14000,    genka:11200},
-    {cat:'住設機器',    name:'タオルリング+紙巻器',    basis:'箇所数',                qty: p.tl,                       unit:'箇所', tanka:10000,    genka:8000},
-    {cat:'住設機器',    name:'洗面台W600/750',         basis:'部屋数',                qty: h,                          unit:'箇所', tanka:63000,    genka:50400},
-    {cat:'住設機器',    name:'洗濯パン640',            basis:'部屋数',                qty: h,                          unit:'箇所', tanka:5000,     genka:4000},
-    {cat:'住設機器',    name:'キッチン（対面）',       basis:'部屋数',                qty: h,                          unit:'箇所', tanka:190000,   genka:152000},
-    {cat:'住設機器',    name:'キッチン配送費',         basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:20000,    genka:20000},
-    {cat:'住設機器',    name:'IHクッキングヒーター',   basis:'部屋数',                qty: h,                          unit:'箇所', tanka:54800,    genka:43840},
-    {cat:'住設機器',    name:'ユニットバス1116',       basis:'部屋数',                qty: h,                          unit:'箇所', tanka:200000,   genka:160000},
-    {cat:'住設機器',    name:'ユニットバス配送費',     basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:22500,    genka:22500},
-    {cat:'住設機器',    name:'食器棚W900',             basis:'部屋数',                qty: h,                          unit:'箇所', tanka:96000,    genka:76800},
-    {cat:'住設機器',    name:'食器棚配送費',           basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:50000,    genka:50000},
-    {cat:'住設機器',    name:'洗濯機上収納',           basis:'部屋数',                qty: h,                          unit:'箇所', tanka:4000,     genka:3200},
-    {cat:'建具・サッシ',name:'各部屋玄関ドア',         basis:boka?'防火仕様':'非防火', qty:h,                          unit:'箇所', tanka:boka?125000:53000, genka:boka?100000:42400},
-    {cat:'建具・サッシ',name:'共用部ドア',             basis:boka?'防火仕様':'非防火', qty:1,                          unit:'棟',   tanka:boka?450000:250000, genka:boka?360000:200000},
-    {cat:'建具・サッシ',name:'腰窓',                   basis:boka?'防火仕様':'非防火', qty:p.kw,                       unit:'箇所', tanka:boka?75000:45000, genka:boka?60000:36000},
-    {cat:'建具・サッシ',name:'縦滑り窓',               basis:boka?'防火仕様':'非防火', qty:p.ts,                       unit:'箇所', tanka:boka?55000:30000, genka:boka?44000:24000},
-    {cat:'建具・サッシ',name:'バルコニー窓',           basis:boka?'防火仕様':'非防火', qty:p.bw,                       unit:'箇所', tanka:boka?160000:70000, genka:boka?128000:56000},
-    {cat:'建具・サッシ',name:'開き戸（D）',            basis:'箇所数',                qty: p.dn,                       unit:'箇所', tanka:19000,    genka:15200},
-    {cat:'建具・サッシ',name:'引き戸（SD）',           basis:'箇所数',                qty: p.sdn,                      unit:'箇所', tanka:27000,    genka:21600},
-    {cat:'建具・サッシ',name:'折れ戸（CL）',           basis:'箇所数',                qty: p.cl,                       unit:'箇所', tanka:25000,    genka:20000},
-    {cat:'建具・サッシ',name:'靴箱',                   basis:'部屋数',                qty: h,                          unit:'箇所', tanka:30000,    genka:24000},
-    {cat:'建具・サッシ',name:'クローゼット枕棚',       basis:'箇所数',                qty: p.cl,                       unit:'箇所', tanka:9000,     genka:7200},
-    {cat:'建具・サッシ',name:'カーテンレール2m',       basis:'腰窓+バルコニー窓',     qty: p.kw+p.bw,                  unit:'箇所', tanka:2200,     genka:1760},
-    {cat:'建具・サッシ',name:'カーテンレール1m',       basis:'縦滑り窓',              qty: p.ts,                       unit:'箇所', tanka:1700,     genka:1360},
-    {cat:'外装・屋根',  name:'屋根工事',               basis:'建築面積（㎡）',        qty: p.km,                       unit:'㎡',   tanka:8800,     genka:7040},
-    {cat:'外装・屋根',  name:'外壁工事',               basis:'外壁面積（㎡）',        qty: gh,                         unit:'㎡',   tanka:6500,     genka:5200},
-    {cat:'外装・屋根',  name:'軒天材',                 basis:'(ﾊﾞﾙｺﾆｰ+共用部)÷2.7573', qty:(p.bl+p.ky)/2.7573,          unit:'枚',   tanka:5210,     genka:4168},
-    {cat:'外装・屋根',  name:'基礎左官',               basis:'外周長さ',              qty: p.gm,                       unit:'m',    tanka:1300,     genka:1040},
-    {cat:'外装・屋根',  name:'外部鉄骨階段',           basis:p.gaidan==='あり'?'あり':'なし', qty:p.gaidan==='あり'?1:0, unit:'棟',  tanka:1200000,  genka:960000},
-    {cat:'外装・屋根',  name:'外部鉄骨階段塗装',       basis:p.gaidan==='あり'?'あり':'なし', qty:p.gaidan==='あり'?1:0, unit:'棟',  tanka:200000,   genka:160000},
-    {cat:'照明・エアコン',name:'各部屋照明器具',        basis:isL?'1LDK':'1K',        qty: h,                          unit:'部屋', tanka:isL?50000:30000, genka:isL?40000:24000},
-    {cat:'照明・エアコン',name:'共用部照明',            basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:100000,   genka:80000},
-    {cat:'照明・エアコン',name:'エアコン本体',          basis:isL?'2.8kw':'2.2kw',    qty: p.ac,                       unit:'台',   tanka:isL?56000:43000, genka:isL?44800:34400},
-    {cat:'照明・エアコン',name:'エアコン取付費',        basis:'台数',                  qty: p.ac,                       unit:'台',   tanka:40000,    genka:32000},
-    {cat:'セキュリティ',name:'オートロック設備',        basis:p.autolock==='あり'?'あり':'なし', qty:p.autolock==='あり'?1:0, unit:'棟', tanka:275000, genka:220000},
-    {cat:'セキュリティ',name:'インターホン',            basis:p.autolock==='あり'?'対応':'非対応', qty:h,               unit:'部屋', tanka:p.autolock==='あり'?30000:13000, genka:p.autolock==='あり'?24000:10400},
-    {cat:'セキュリティ',name:'サイン工事',              basis:'1棟固定',               qty: 1,                          unit:'棟',   tanka:200000,   genka:160000},
+    // ── 仮設・共通 ──
+    {cat:'仮設・共通',  name:'仮設足場',            basis:'外周長×1.1×高さ',    qty:p.gm*1.1*(k===2?7:9.5), unit:'㎡',   tanka:800,    genka:620},
+    {cat:'仮設・共通',  name:'共通仮設費用',         basis:'1棟固定',             qty:1,                      unit:'式',   tanka:500000, genka:380000},
+    {cat:'仮設・共通',  name:'完成後クリーニング',   basis:'延床面積×400',        qty:nm2,                    unit:'㎡',   tanka:400,    genka:300},
+    {cat:'仮設・共通',  name:'外部借上駐車場',       basis:'1現場固定',           qty:1,                      unit:'式',   tanka:800000, genka:800000},
+    {cat:'仮設・共通',  name:'産廃',                 basis:'施工面積（坪）',      qty:p.bm*1.078,             unit:'坪',   tanka:9000,   genka:7000},
+    // ── 基礎・地盤 ──
+    {cat:'基礎・地盤',  name:'基礎工事（3階建）',   basis:'基礎面積（坪）',      qty:p.ik*1.079,             unit:'坪',   tanka:85000,  genka:62000},
+    {cat:'基礎・地盤',  name:'地盤改良',             basis:p.jiban==='あり'?'あり':'なし(0)', qty:p.jiban==='あり'?1:0, unit:'式', tanka:1500000, genka:1200000},
+    // ── 構造・木工事 ──
+    {cat:'構造・木工事',name:'建て方（在来）',       basis:'施工面積（坪）',      qty:p.bm*1.078,             unit:'坪',   tanka:isZ?11000:(k===3?13000:12000), genka:isZ?8000:(k===3?9500:8800)},
+    {cat:'構造・木工事',name:'木材（在来）',         basis:'施工面積（坪）',      qty:p.bm*1.078,             unit:'坪',   tanka:isZ?75000:86000, genka:isZ?58000:67000},
+    {cat:'構造・木工事',name:'防水材・点検口',       basis:'1棟固定',             qty:1,                      unit:'式',   tanka:300000, genka:230000},
+    {cat:'構造・木工事',name:'内部造作（在来）',     basis:'延床面積（坪）',      qty:p.nb,                   unit:'坪',   tanka:isZ?33000:25000, genka:isZ?24000:18500},
+    {cat:'構造・木工事',name:'共用部造作',           basis:'1棟固定',             qty:1,                      unit:'式',   tanka:500000, genka:380000},
+    // ── 設備 ──
+    {cat:'設備',        name:'換気材',               basis:'部屋数',              qty:h,                      unit:'部屋', tanka:19000,  genka:14000},
+    {cat:'設備',        name:'電気配線工事',         basis:'部屋数',              qty:h,                      unit:'部屋', tanka:360000, genka:280000},
+    {cat:'設備',        name:'給排水工事',           basis:'部屋数',              qty:h,                      unit:'部屋', tanka:500000, genka:390000},
+    {cat:'設備',        name:'室外物干し',           basis:'部屋数（バルコニー）', qty:h,                     unit:'部屋', tanka:9400,   genka:7200},
+    {cat:'設備',        name:'室内物干し',           basis:'部屋数',              qty:h,                      unit:'部屋', tanka:6600,   genka:5000},
+    {cat:'設備',        name:'火災報知器',           basis:'部屋数',              qty:h,                      unit:'部屋', tanka:3900,   genka:3000},
+    {cat:'設備',        name:'非常照明・消火器等',   basis:'1棟固定',             qty:1,                      unit:'式',   tanka:100000, genka:78000},
+    {cat:'設備',        name:'給湯器',               basis:'部屋数',              qty:h,                      unit:'部屋', tanka:63000,  genka:48000},
+    {cat:'設備',        name:'ガス工事',             basis:gas170?'都市ガス':'プロパン', qty:h,               unit:'部屋', tanka:gas170?170000:35000, genka:gas170?130000:26000},
+    // ── 断熱材 ──
+    {cat:'断熱材',      name:'各階外周部断熱材',     basis:'外周面積概算÷3',      qty:Math.round(43*hRatio),  unit:'本',   tanka:5250,   genka:4000},
+    {cat:'断熱材',      name:'界壁断熱材',           basis:'界壁面積概算÷1.5',    qty:Math.round(24*hRatio),  unit:'本',   tanka:6550,   genka:5000},
+    {cat:'断熱材',      name:'各階天井断熱材',       basis:'延床坪÷3',            qty:Math.round(35*hRatio),  unit:'本',   tanka:5250,   genka:4000},
+    // ── 石膏ボード ──
+    {cat:'石膏ボード',  name:'外周部石膏ボード（3F）',basis:'外周㎡÷2.2022',      qty:Math.round(196*bRatio), unit:'枚',   tanka:1500,   genka:1150},
+    {cat:'石膏ボード',  name:'界壁石膏ボード',       basis:'両面二重張り÷2.2022', qty:Math.round(212*hRatio), unit:'枚',   tanka:720,    genka:560},
+    {cat:'石膏ボード',  name:'1F天井石膏ボード（3F）',basis:'天井㎡÷1.6562',      qty:Math.round(60*bRatio),  unit:'枚',   tanka:1100,   genka:850},
+    {cat:'石膏ボード',  name:'2F天井石膏ボード（3F）',basis:'天井㎡÷1.6562',      qty:Math.round(60*bRatio),  unit:'枚',   tanka:1100,   genka:850},
+    ...(k===3?[{cat:'石膏ボード',name:'3F天井石膏ボード',basis:'天井㎡÷1.6562',qty:Math.round(60*bRatio),unit:'枚',tanka:540,genka:420}]:[]),
+    {cat:'石膏ボード',  name:'間仕切り石膏ボード（3F）',basis:'間仕切り㎡÷2.2022', qty:Math.round(180*hRatio),unit:'枚',   tanka:1500,   genka:1150},
+    {cat:'石膏ボード',  name:'遮音シート',           basis:'界壁㎡÷9.1',          qty:Math.round(26*hRatio),  unit:'本',   tanka:2700,   genka:2050},
+    // ── 床材 ──
+    {cat:'床材',        name:'ユカテック（2・3F）',  basis:'床面積÷1.10292',      qty:Math.round(181*bRatio), unit:'枚',   tanka:2800,   genka:2150},
+    {cat:'床材',        name:'スーパーハード（2・3F）',basis:'床面積÷1.6562',     qty:Math.round(120*bRatio), unit:'枚',   tanka:1500,   genka:1150},
+    {cat:'床材',        name:'壁下地・床下地',       basis:'部屋数',              qty:h,                      unit:'部屋', tanka:40000,  genka:31000},
+    {cat:'床材',        name:'フローリング',         basis:'1部屋約25㎡×部屋数', qty:Math.round(25*h),       unit:'㎡',   tanka:2200,   genka:1700},
+    {cat:'床材',        name:'クッションフロア',     basis:'1部屋約4㎡×部屋数',  qty:Math.round(4*h),        unit:'㎡',   tanka:3500,   genka:2700},
+    // ── 内装仕上 ──
+    {cat:'内装仕上',    name:'壁クロス',             basis:'壁面約72㎡/部屋×部屋数', qty:Math.round(72*h),   unit:'㎡',   tanka:1100,   genka:820},
+    {cat:'内装仕上',    name:'天井クロス',           basis:'天井約30㎡/部屋×部屋数', qty:Math.round(30*h),   unit:'㎡',   tanka:1100,   genka:820},
+    {cat:'内装仕上',    name:'造作部材',             basis:'部屋数',              qty:h,                      unit:'部屋', tanka:40000,  genka:31000},
+    {cat:'内装仕上',    name:'内部コーキング',       basis:'部屋数',              qty:h,                      unit:'部屋', tanka:20000,  genka:15500},
+    {cat:'内装仕上',    name:'玄関タイル工事',       basis:'部屋数',              qty:h,                      unit:'部屋', tanka:16000,  genka:12400},
+    {cat:'内装仕上',    name:'コートかけ・傘掛け等', basis:'部屋数',              qty:h,                      unit:'部屋', tanka:20000,  genka:15500},
+    {cat:'内装仕上',    name:'リペア',               basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:100000, genka:78000},
+    {cat:'内装仕上',    name:'共用部長尺シート貼り', basis:'共用部+階段㎡×3,500', qty:Math.round(60*hRatio),  unit:'㎡',   tanka:3500,   genka:2700},
+    // ── 建具・サッシ ──
+    {cat:'建具・サッシ',name:'開き戸（D）',          basis:'箇所数',              qty:p.dn,                   unit:'箇所', tanka:19000,  genka:14800},
+    {cat:'建具・サッシ',name:'引き戸（SD）',         basis:'箇所数',              qty:p.sdn,                  unit:'箇所', tanka:27000,  genka:21000},
+    {cat:'建具・サッシ',name:'3本引き戸',            basis:'各室1箇所×部屋数',    qty:h,                      unit:'箇所', tanka:100000, genka:78000},
+    {cat:'建具・サッシ',name:'折れ戸（CL）',         basis:'箇所数',              qty:p.cl,                   unit:'箇所', tanka:25000,  genka:19500},
+    {cat:'建具・サッシ',name:'靴箱',                 basis:'部屋数',              qty:h,                      unit:'箇所', tanka:30000,  genka:23000},
+    {cat:'建具・サッシ',name:'クローゼット枕棚',     basis:'箇所数',              qty:p.cl,                   unit:'箇所', tanka:9000,   genka:7000},
+    {cat:'建具・サッシ',name:'各部屋玄関ドア（防火）',basis:'防火仕様',           qty:h,                      unit:'箇所', tanka:125000, genka:97000},
+    {cat:'建具・サッシ',name:'共用部ドア（防火）',   basis:'オートロック対応防火', qty:1,                      unit:'箇所', tanka:460000, genka:360000},
+    {cat:'建具・サッシ',name:'腰窓（防火）',         basis:'防火仕様',            qty:p.kw,                   unit:'箇所', tanka:75000,  genka:58000},
+    {cat:'建具・サッシ',name:'縦滑り窓（防火）',     basis:'防火仕様',            qty:p.ts,                   unit:'箇所', tanka:55000,  genka:43000},
+    {cat:'建具・サッシ',name:'バルコニー窓（防火）', basis:'各室1箇所×防火仕様',  qty:p.bw,                   unit:'箇所', tanka:160000, genka:124000},
+    {cat:'建具・サッシ',name:'カーテンレール2m',     basis:'腰窓+バルコニー窓',   qty:p.kw+p.bw,              unit:'箇所', tanka:2200,   genka:1700},
+    {cat:'建具・サッシ',name:'カーテンレール1m',     basis:'縦滑り窓',            qty:p.ts,                   unit:'箇所', tanka:1700,   genka:1300},
+    // ── 住設機器 ──
+    {cat:'住設機器',    name:'トイレ',               basis:'箇所数',              qty:p.tl,                   unit:'箇所', tanka:53000,  genka:41000},
+    {cat:'住設機器',    name:'トイレ収納',           basis:'箇所数',              qty:p.tl,                   unit:'箇所', tanka:14000,  genka:10900},
+    {cat:'住設機器',    name:'タオルリング+紙巻器',  basis:'箇所数',              qty:p.tl,                   unit:'箇所', tanka:10000,  genka:7800},
+    {cat:'住設機器',    name:'洗面台W600',           basis:'図面よりW600',        qty:h,                      unit:'箇所', tanka:63000,  genka:49000},
+    {cat:'住設機器',    name:'洗濯パン600サイズ',    basis:'部屋数',              qty:h,                      unit:'箇所', tanka:10000,  genka:7800},
+    {cat:'住設機器',    name:'キッチン1800（対面）', basis:'部屋数',              qty:h,                      unit:'箇所', tanka:190000, genka:148000},
+    {cat:'住設機器',    name:'キッチン配送費',       basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:20000,  genka:20000},
+    {cat:'住設機器',    name:'IHクッキングヒーター', basis:'部屋数',              qty:h,                      unit:'箇所', tanka:54800,  genka:42000},
+    {cat:'住設機器',    name:'ユニットバス1216',     basis:'図面より1216サイズ',  qty:h,                      unit:'箇所', tanka:200000, genka:156000},
+    {cat:'住設機器',    name:'ユニットバス配送費',   basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:22500,  genka:22500},
+    // ── 照明・エアコン ──
+    {cat:'照明・エアコン',name:'照明器具（1LDK）',   basis:'部屋数',              qty:h,                      unit:'部屋', tanka:60000,  genka:46000},
+    {cat:'照明・エアコン',name:'共用部照明',         basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:100000, genka:78000},
+    {cat:'照明・エアコン',name:'外部鉄骨階段',       basis:p.gaidan==='あり'?'あり':'なし', qty:p.gaidan==='あり'?1:0, unit:'棟', tanka:1200000, genka:940000},
+    {cat:'照明・エアコン',name:'外部鉄骨階段塗装',   basis:p.gaidan==='あり'?'あり':'なし', qty:p.gaidan==='あり'?1:0, unit:'棟', tanka:200000, genka:156000},
+    {cat:'照明・エアコン',name:'エアコン2.8kw',      basis:'リビング洋室隣接',    qty:p.ac,                   unit:'台',   tanka:73000,  genka:55000},
+    {cat:'照明・エアコン',name:'エアコン取付費',     basis:'台数',                qty:p.ac,                   unit:'台',   tanka:40000,  genka:31000},
+    // ── 外装・屋根 ──
+    {cat:'外装・屋根',  name:'屋根工事',             basis:'建築面積（㎡）',      qty:p.km,                   unit:'㎡',   tanka:8800,   genka:6800},
+    {cat:'外装・屋根',  name:'外壁工事',             basis:'外壁面積概算',        qty:Math.round(700*bRatio), unit:'㎡',   tanka:6500,   genka:5000},
+    {cat:'外装・屋根',  name:'軒天材',               basis:'軒天面積÷2.7573',     qty:Math.round(20*bRatio),  unit:'㎡',   tanka:5210,   genka:4000},
+    {cat:'外装・屋根',  name:'基礎左官',             basis:'外周長さ',            qty:p.gm,                   unit:'m',    tanka:1300,   genka:1000},
+    // ── セキュリティ ──
+    {cat:'セキュリティ',name:'オートロック',         basis:p.autolock==='あり'?'あり':'なし', qty:p.autolock==='あり'?1:0, unit:'棟', tanka:275000, genka:214000},
+    {cat:'セキュリティ',name:'インターホン（対応）', basis:'オートロック対応',    qty:h,                      unit:'部屋', tanka:30000,  genka:23400},
+    {cat:'セキュリティ',name:'サイン工事',           basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:200000, genka:156000},
   ];
 
   if (p.maizo) {
-    rows.push({cat:'特殊仕様', name:'GRRシート工法（埋蔵文化財対応）', basis:'埋蔵文化財包蔵地', qty:p.bm, unit:'坪', tanka:15000, genka:12000});
+    rows.push({cat:'特殊仕様', name:'GRRシート工法（埋蔵文化財対応）', basis:'埋蔵文化財包蔵地', qty:p.bm, unit:'坪', tanka:15000, genka:11700});
   }
 
   const computed = rows.map(r => ({
