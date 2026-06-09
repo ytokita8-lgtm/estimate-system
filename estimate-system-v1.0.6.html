@@ -520,14 +520,18 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 
         <!-- 地盤安心マップへのリンク -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <a id="jiban-map-link" href="#" target="_blank" rel="noopener"
-            style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--navy);color:white;border-radius:var(--r2);font-size:13px;font-weight:700;text-decoration:none;">
+          <button id="jiban-map-btn"
+            onclick="window.open(this.dataset.url,'_blank','noopener')"
+            data-url="https://jibannet.co.jp/map/"
+            style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--navy);color:white;border-radius:var(--r2);font-size:13px;font-weight:700;border:none;cursor:pointer;">
             🗺️ 地盤安心マップで詳細確認
-          </a>
-          <a id="jiban-support-link" href="#" target="_blank" rel="noopener"
-            style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue-border);border-radius:var(--r2);font-size:13px;font-weight:700;text-decoration:none;">
+          </button>
+          <button id="jiban-support-btn"
+            onclick="window.open(this.dataset.url,'_blank','noopener')"
+            data-url="https://sumaken.j-shield.co.jp/supportmap/"
+            style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue-border);border-radius:var(--r2);font-size:13px;font-weight:700;cursor:pointer;">
             🔍 地盤サポートマップで確認
-          </a>
+          </button>
         </div>
         <div style="font-size:10px;color:var(--gray3);margin-top:8px;">※地形分類は参考情報です。確定には専門家による地盤調査（SS試験等）が必要です。</div>
       </div>
@@ -1130,12 +1134,12 @@ async function fetchJiban() {
         </div>`;
     }
 
-    // 外部リンクURL設定
+    // 外部ボタンのURL更新（住所付き）
     const encAddr = encodeURIComponent(addr);
-    document.getElementById('jiban-map-link').href =
-      `https://jibannet.co.jp/map/?search=${encAddr}`;
-    document.getElementById('jiban-support-link').href =
-      `https://sumaken.j-shield.co.jp/supportmap/?search=${encAddr}`;
+    const mapBtn = document.getElementById('jiban-map-btn');
+    const supBtn = document.getElementById('jiban-support-btn');
+    if (mapBtn) mapBtn.dataset.url = `https://jibannet.co.jp/map/?search=${encAddr}`;
+    if (supBtn) supBtn.dataset.url = `https://sumaken.j-shield.co.jp/supportmap/?search=${encAddr}`;
 
     toast('🌍 地盤情報を取得しました');
 
@@ -1147,14 +1151,14 @@ async function fetchJiban() {
         ❌ ${e.message || '地盤情報の取得に失敗しました'}<br>
         <span style="font-size:11px;">下のボタンから手動で確認してください。</span>
         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-          <a href="https://jibannet.co.jp/map/" target="_blank" rel="noopener"
-            style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--navy);color:white;border-radius:var(--r2);font-size:12px;font-weight:700;text-decoration:none;">
+          <button onclick="window.open('https://jibannet.co.jp/map/','_blank','noopener')"
+            style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--navy);color:white;border-radius:var(--r2);font-size:12px;font-weight:700;border:none;cursor:pointer;">
             🗺️ 地盤安心マップを開く
-          </a>
-          <a href="https://sumaken.j-shield.co.jp/supportmap/" target="_blank" rel="noopener"
-            style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);border-radius:var(--r2);font-size:12px;font-weight:700;text-decoration:none;">
+          </button>
+          <button onclick="window.open('https://sumaken.j-shield.co.jp/supportmap/','_blank','noopener')"
+            style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);border-radius:var(--r2);font-size:12px;font-weight:700;cursor:pointer;">
             🔍 地盤サポートマップを開く
-          </a>
+          </button>
         </div>
       </div>`;
     toast('住所から座標を取得できませんでした');
