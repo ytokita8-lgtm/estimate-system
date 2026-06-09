@@ -1,0 +1,2269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>木造アパート見積システム — 創世建設</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f3ee;--white:#ffffff;--ink:#16140f;
+  --gray1:#f0ede6;--gray2:#e0ddd4;--gray3:#b8b4a8;--gray4:#7a7568;
+  --navy:#1a2744;--navy2:#243353;--navy-light:#eef2fc;
+  --green:#1e7a44;--green-bg:#eaf5ef;--green-border:#a8dbb8;
+  --amber:#c07010;--amber-bg:#fdf5e6;--amber-border:#f0c870;
+  --red:#c03028;--red-bg:#fdf0ee;--red-border:#f0a8a0;
+  --blue:#1848a0;--blue-bg:#eef2fc;--blue-border:#b0c4f0;
+  --purple:#6b46c1;--purple-bg:#f3f0ff;
+  --shadow-sm:0 1px 4px rgba(0,0,0,.08);
+  --shadow:0 2px 16px rgba(0,0,0,.10);
+  --shadow-lg:0 8px 40px rgba(0,0,0,.14);
+  --r:8px;--r2:14px;--r3:20px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;min-height:100vh;}
+
+/* ── TOPBAR ── */
+.topbar{
+  position:sticky;top:0;z-index:200;
+  background:rgba(26,39,68,.96);backdrop-filter:blur(12px);
+  height:56px;display:flex;align-items:center;padding:0 20px;gap:14px;
+  box-shadow:0 2px 12px rgba(0,0,0,.2);
+}
+.tb-logo{font-size:15px;font-weight:900;color:white;letter-spacing:.02em;white-space:nowrap;}
+.tb-logo span{font-size:10px;font-weight:400;color:rgba(255,255,255,.4);margin-left:6px;font-family:'JetBrains Mono',monospace;}
+.tb-version{
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+  color:rgba(255,255,255,.6);padding:2px 8px;border-radius:10px;white-space:nowrap;
+}
+.tb-mode{
+  margin-left:auto;display:flex;align-items:center;gap:8px;
+}
+.mode-btn{
+  font-size:11px;padding:4px 12px;border-radius:14px;cursor:pointer;border:none;font-family:'Noto Sans JP',sans-serif;
+  transition:all .15s;white-space:nowrap;
+}
+.mode-btn.active{background:white;color:var(--navy);font-weight:700;}
+.mode-btn.inactive{background:rgba(255,255,255,.12);color:rgba(255,255,255,.6);}
+.mode-btn:hover.inactive{background:rgba(255,255,255,.2);color:white;}
+.tb-pulse{width:8px;height:8px;border-radius:50%;background:#4aba6a;flex-shrink:0;animation:pulse 2s ease-in-out infinite;}
+.tb-pulse.loading{background:#f0c040;animation:sp .8s linear infinite;}
+.tb-pulse.err{background:#e05050;animation:none;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.8);}}
+@keyframes sp{to{transform:rotate(360deg);}}
+.tb-status{font-size:11px;color:rgba(255,255,255,.45);font-family:'JetBrains Mono',monospace;}
+
+/* ── MAIN LAYOUT ── */
+.main{max-width:960px;margin:0 auto;padding:24px 16px 60px;}
+
+/* ── STEP NAV ── */
+.step-nav{
+  display:flex;gap:0;background:var(--white);border-radius:var(--r2);
+  overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:20px;
+}
+.step-item{
+  flex:1;padding:14px 8px;text-align:center;cursor:pointer;
+  border-right:1px solid var(--gray2);transition:all .15s;
+  position:relative;
+}
+.step-item:last-child{border-right:none;}
+.step-item.active{background:var(--navy);color:white;}
+.step-item.done{background:var(--green-bg);color:var(--green);}
+.step-item.inactive{background:var(--white);color:var(--gray3);}
+.step-item.active::after{
+  content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;
+  border-top:8px solid var(--navy);
+}
+.si-num{font-family:'JetBrains Mono',monospace;font-size:11px;margin-bottom:4px;opacity:.7;}
+.si-icon{font-size:18px;margin-bottom:3px;}
+.si-label{font-size:11px;font-weight:700;}
+
+/* ── CARD ── */
+.card{background:var(--white);border-radius:var(--r2);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+.card-title{
+  font-size:13px;font-weight:700;color:var(--navy);
+  border-left:3px solid var(--blue);padding-left:10px;margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;
+}
+.card-sub{font-size:11px;color:var(--gray4);font-weight:400;margin-left:auto;}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+@media(max-width:640px){.g3{grid-template-columns:1fr 1fr;}.g4{grid-template-columns:1fr 1fr;}}
+
+/* ── FORM ── */
+.f-label{font-size:11px;color:var(--gray4);display:block;margin-bottom:4px;font-weight:500;}
+.f-input,.f-select,.f-textarea{
+  width:100%;font-size:13px;padding:8px 10px;
+  border:1px solid var(--gray2);border-radius:var(--r);
+  background:var(--white);color:var(--ink);font-family:'Noto Sans JP',sans-serif;
+  transition:border-color .15s;outline:none;
+}
+.f-input:focus,.f-select:focus,.f-textarea:focus{border-color:var(--blue);}
+.f-input[type=number]{font-family:'JetBrains Mono',monospace;}
+.f-textarea{resize:vertical;min-height:60px;}
+.f-note{font-size:10px;color:var(--gray3);margin-top:3px;}
+.f-auto{border-color:var(--green-border)!important;background:var(--green-bg)!important;color:var(--green)!important;}
+
+/* ── BUTTONS ── */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 18px;font-size:13px;font-weight:700;
+  border-radius:var(--r2);cursor:pointer;border:none;
+  font-family:'Noto Sans JP',sans-serif;transition:all .15s;white-space:nowrap;
+}
+.btn-primary{background:var(--navy);color:white;}
+.btn-primary:hover{background:var(--navy2);}
+.btn-success{background:var(--green);color:white;}
+.btn-success:hover{opacity:.88;}
+.btn-outline{background:transparent;color:var(--blue);border:1.5px solid var(--blue-border);}
+.btn-outline:hover{background:var(--blue-bg);}
+.btn-ghost{background:var(--gray1);color:var(--ink);}
+.btn-ghost:hover{background:var(--gray2);}
+.btn-danger{background:var(--red);color:white;}
+.btn-sm{padding:6px 12px;font-size:12px;}
+.btn-row{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;}
+.btn-row-space{display:flex;gap:10px;justify-content:space-between;margin-top:16px;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+/* ── ALERT ── */
+.alert{padding:12px 16px;border-radius:var(--r);margin-bottom:12px;font-size:12px;line-height:1.6;border-left:3px solid;}
+.alert-info{background:var(--blue-bg);border-color:var(--blue);color:var(--blue);}
+.alert-warn{background:var(--amber-bg);border-color:var(--amber);color:var(--amber);}
+.alert-ok{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.alert-err{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+.alert-purple{background:var(--purple-bg);border-color:var(--purple);color:var(--purple);}
+
+/* ── BADGE ── */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:700;padding:3px 10px;border-radius:14px;
+  margin:2px 4px 2px 0;
+}
+.badge-red{background:var(--red-bg);color:var(--red);}
+.badge-amber{background:var(--amber-bg);color:var(--amber);}
+.badge-green{background:var(--green-bg);color:var(--green);}
+.badge-blue{background:var(--blue-bg);color:var(--blue);}
+.badge-purple{background:var(--purple-bg);color:var(--purple);}
+.badge-navy{background:var(--navy-light);color:var(--navy);}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{
+  border:2px dashed var(--gray2);border-radius:var(--r2);
+  padding:32px;text-align:center;cursor:pointer;transition:all .15s;
+  background:var(--gray1);position:relative;
+}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--blue);background:var(--blue-bg);}
+.uz-icon{font-size:36px;margin-bottom:10px;}
+.uz-title{font-size:14px;font-weight:700;margin-bottom:4px;}
+.uz-sub{font-size:11px;color:var(--gray4);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+
+/* ── PREVIEW THUMBS ── */
+.thumb-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+.thumb{
+  position:relative;width:80px;height:80px;border-radius:var(--r);overflow:hidden;
+  border:1px solid var(--gray2);flex-shrink:0;
+}
+.thumb img{width:100%;height:100%;object-fit:cover;}
+.thumb-del{
+  position:absolute;top:2px;right:2px;
+  background:rgba(0,0,0,.6);color:white;border:none;
+  border-radius:50%;width:18px;height:18px;font-size:10px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+
+/* ── AI PARSING ── */
+.parse-steps{margin-top:14px;}
+.ps-row{display:flex;align-items:center;gap:10px;font-size:12px;padding:7px 0;border-bottom:1px solid var(--gray1);}
+.ps-row:last-child{border-bottom:none;}
+.ps-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--gray2);}
+.ps-dot.done{background:var(--green);}
+.ps-dot.running{background:var(--amber);animation:pulse .8s infinite;}
+.ps-dot.err{background:var(--red);}
+.ps-label{flex:1;color:var(--gray4);}
+.ps-label.done{color:var(--ink);}
+.ps-val{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue);font-weight:700;}
+
+/* ── ZONING CARD ── */
+.zone-result{
+  background:var(--navy);color:white;border-radius:var(--r2);
+  padding:16px 20px;margin-bottom:12px;
+}
+.zr-title{font-size:11px;color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;margin-bottom:6px;}
+.zr-name{font-size:16px;font-weight:900;margin-bottom:10px;}
+.zr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.zr-item{background:rgba(255,255,255,.1);border-radius:var(--r);padding:8px;}
+.zri-label{font-size:9px;color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;margin-bottom:3px;}
+.zri-val{font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+
+/* ── AUTO SPEC BADGES ── */
+.spec-applied{background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--r);padding:12px 16px;margin-bottom:12px;}
+.sa-title{font-size:11px;font-weight:700;color:var(--amber);margin-bottom:8px;}
+.sa-items{display:flex;flex-wrap:wrap;gap:6px;}
+
+/* ── SECTION DIVIDER ── */
+.sec-div{
+  font-size:11px;font-weight:700;color:var(--gray4);
+  letter-spacing:.1em;text-transform:uppercase;
+  padding:12px 0 6px;border-bottom:1px solid var(--gray2);margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+}
+
+/* ── TOTAL BOX ── */
+.total-box{
+  background:var(--navy);color:white;border-radius:var(--r2);
+  padding:20px 24px;margin-bottom:16px;
+}
+.tb2-label{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:4px;}
+.tb2-amount{font-size:32px;font-weight:900;font-family:'JetBrains Mono',monospace;letter-spacing:-.01em;}
+.tb2-sub{font-size:12px;color:rgba(255,255,255,.55);margin-top:4px;}
+.tb2-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.15);}
+.tbs-item{text-align:center;}
+.tbs-label{font-size:10px;color:rgba(255,255,255,.45);margin-bottom:4px;}
+.tbs-val{font-size:14px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+
+/* ── ESTIMATE TABLE ── */
+.est-table{width:100%;border-collapse:collapse;font-size:12px;}
+.est-table th{background:var(--gray1);padding:8px 10px;text-align:left;font-weight:700;color:var(--gray4);border-bottom:2px solid var(--gray2);white-space:nowrap;}
+.est-table th.r{text-align:right;}
+.est-table td{padding:7px 10px;border-bottom:1px solid var(--gray1);}
+.est-table td.r{text-align:right;font-family:'JetBrains Mono',monospace;}
+.est-table td.amt{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;}
+.est-cat-row td{background:var(--navy-light);font-weight:700;color:var(--navy);font-size:11px;padding:6px 10px;}
+.est-table tr:hover td{background:var(--gray1);}
+.est-table tr:hover .est-cat-row td{background:var(--navy-light);}
+.table-wrap{overflow-x:auto;}
+
+/* ── GENKA (原価管理) ── */
+.genka-badge{
+  display:inline-block;font-size:9px;font-weight:700;
+  background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);
+  padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;
+}
+.genka-input{
+  width:90px;font-size:11px;padding:3px 6px;
+  border:1px solid var(--gray2);border-radius:4px;
+  font-family:'JetBrains Mono',monospace;text-align:right;
+}
+.margin-pos{color:var(--green);font-weight:700;}
+.margin-neg{color:var(--red);font-weight:700;}
+
+/* ── OUTPUT PANEL ── */
+.output-options{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+.out-card{
+  background:var(--white);border:1.5px solid var(--gray2);border-radius:var(--r2);
+  padding:18px;text-align:center;cursor:pointer;transition:all .15s;
+}
+.out-card:hover{border-color:var(--blue);background:var(--blue-bg);}
+.out-card.selected{border-color:var(--blue);background:var(--blue-bg);}
+.oc-icon{font-size:28px;margin-bottom:8px;}
+.oc-label{font-size:13px;font-weight:700;margin-bottom:4px;}
+.oc-desc{font-size:11px;color:var(--gray4);}
+
+/* ── VERSION LOG ── */
+.version-log{
+  background:var(--gray1);border-radius:var(--r);
+  padding:10px 14px;font-size:11px;color:var(--gray4);
+  font-family:'JetBrains Mono',monospace;line-height:1.8;
+}
+.vl-entry{display:flex;gap:10px;}
+.vl-ver{color:var(--blue);font-weight:700;min-width:60px;}
+.vl-date{color:var(--gray3);min-width:90px;}
+
+/* ── SPINNER ── */
+.spin{width:18px;height:18px;border-radius:50%;border:2px solid var(--gray2);border-top-color:var(--blue);animation:sp .7s linear infinite;flex-shrink:0;}
+.spin-sm{width:12px;height:12px;border-width:2px;}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--navy);color:white;border-radius:20px;
+  padding:10px 20px;font-size:12px;font-weight:500;
+  opacity:0;transition:all .3s;z-index:9999;pointer-events:none;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── LOADING OVERLAY ── */
+#ai-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(26,39,68,.7);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+}
+#ai-overlay.show{display:flex;}
+.ao-card{background:white;border-radius:var(--r2);padding:28px 36px;text-align:center;box-shadow:var(--shadow-lg);}
+.ao-title{font-size:15px;font-weight:700;margin:12px 0 6px;}
+.ao-sub{font-size:12px;color:var(--gray4);}
+.ao-spin{width:44px;height:44px;border-radius:50%;border:3px solid var(--gray2);border-top-color:var(--navy);animation:sp .8s linear infinite;margin:0 auto;}
+
+/* ── SECTION TOGGLE ── */
+.sec-toggle{cursor:pointer;user-select:none;}
+.sec-toggle::before{content:'▼ ';font-size:9px;}
+.sec-toggle.collapsed::before{content:'▶ ';}
+</style>
+</head>
+<body>
+
+<!-- ════ TOPBAR ════ -->
+<div class="topbar">
+  <div class="tb-logo">🏗️ 木造アパート見積システム <span>創世建設株式会社</span></div>
+  <div class="tb-version" id="version-badge">v1.0.0</div>
+  <div class="tb-mode">
+    <button class="mode-btn active" id="btn-mode-est" onclick="setMode('estimate')">📋 見積モード</button>
+    <button class="mode-btn inactive" id="btn-mode-gen" onclick="setMode('genka')">📊 原価管理モード</button>
+  </div>
+  <div class="tb-pulse" id="tb-pulse"></div>
+  <div class="tb-status" id="tb-status">準備完了</div>
+</div>
+
+<!-- ════ AI OVERLAY ════ -->
+<div id="ai-overlay">
+  <div class="ao-card">
+    <div class="ao-spin"></div>
+    <div class="ao-title" id="ao-title">AIが解析中...</div>
+    <div class="ao-sub" id="ao-sub">しばらくお待ちください</div>
+  </div>
+</div>
+
+<!-- ════ MAIN ════ -->
+<div class="main">
+
+  <!-- STEP NAV -->
+  <div class="step-nav">
+    <div class="step-item active" id="sn-0" onclick="goStep(0)">
+      <div class="si-num">01</div><div class="si-icon">🏠</div><div class="si-label">住所・<br>都市計画</div>
+    </div>
+    <div class="step-item inactive" id="sn-1" onclick="goStep(1)">
+      <div class="si-num">02</div><div class="si-icon">📐</div><div class="si-label">図面・<br>写真読込</div>
+    </div>
+    <div class="step-item inactive" id="sn-2" onclick="goStep(2)">
+      <div class="si-num">03</div><div class="si-icon">⚙️</div><div class="si-label">仕様・<br>数量設定</div>
+    </div>
+    <div class="step-item inactive" id="sn-3" onclick="goStep(3)">
+      <div class="si-num">04</div><div class="si-icon">💰</div><div class="si-label">見積<br>確認</div>
+    </div>
+    <div class="step-item inactive" id="sn-4" onclick="goStep(4)">
+      <div class="si-num">05</div><div class="si-icon">📤</div><div class="si-label">出力・<br>保存</div>
+    </div>
+  </div>
+
+  <!-- ════ STEP 0: 住所・都市計画 ════ -->
+  <div id="step-0">
+
+    <!-- 物件基本情報 -->
+    <div class="card">
+      <div class="card-title">📍 物件基本情報</div>
+      <div class="g2" style="margin-bottom:12px;">
+        <div>
+          <label class="f-label">物件名称</label>
+          <input class="f-input" id="prop-name" placeholder="例：〇〇アパート">
+        </div>
+        <div>
+          <label class="f-label">建設地住所</label>
+          <input class="f-input" id="prop-address" placeholder="例：宮城県仙台市太白区鹿野2丁目6-20"
+            onkeydown="if(event.key==='Enter')fetchJiban()">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="fetchJiban()">
+        🌍 地盤情報を自動取得（国土地理院）
+      </button>
+    </div>
+
+    <!-- 都市計画情報 手動入力 -->
+    <div class="card">
+      <div class="card-title">🏛️ 都市計画情報を入力
+        <div class="card-sub">住所をClaudeに貼り付けて調べてもらった結果を入力</div>
+      </div>
+
+      <!-- 使い方ガイド -->
+      <div style="background:var(--navy);border-radius:var(--r);padding:14px 16px;margin-bottom:16px;">
+        <div style="font-size:11px;color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;margin-bottom:8px;">HOW TO USE / 使い方</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.85);line-height:2;">
+          <span style="color:#4aba6a;font-weight:700;">①</span> このClaude.aiのチャットに住所を貼り付けて送信<br>
+          <span style="color:#4aba6a;font-weight:700;">②</span> Claudeが用途地域・防火指定・埋蔵文化財などを調べて回答<br>
+          <span style="color:#4aba6a;font-weight:700;">③</span> 回答をもとに下のフォームに入力する
+        </div>
+        <div style="margin-top:10px;background:rgba(255,255,255,.08);border-radius:6px;padding:8px 12px;font-size:11px;color:rgba(255,255,255,.6);font-family:'JetBrains Mono',monospace;">
+          送信例：「宮城県仙台市太白区鹿野2丁目6-20 の都市計画情報（用途地域・防火・埋蔵文化財）を教えてください」
+        </div>
+      </div>
+
+      <div class="g3">
+        <div>
+          <label class="f-label">用途地域</label>
+          <select class="f-select" id="m-yoto">
+            <option value="">― 選択 ―</option>
+            <option>第一種低層住居専用地域</option>
+            <option>第二種低層住居専用地域</option>
+            <option>第一種中高層住居専用地域</option>
+            <option>第二種中高層住居専用地域</option>
+            <option>第一種住居地域</option>
+            <option>第二種住居地域</option>
+            <option>準住居地域</option>
+            <option>近隣商業地域</option>
+            <option>商業地域</option>
+            <option>準工業地域</option>
+            <option>工業地域</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">建ぺい率</label>
+          <select class="f-select" id="m-kenpei">
+            <option>40%</option><option>50%</option><option>60%</option>
+            <option>70%</option><option>80%</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">容積率</label>
+          <select class="f-select" id="m-yoseki">
+            <option>50%</option><option>80%</option><option>100%</option>
+            <option>150%</option><option>200%</option><option>300%</option>
+            <option>400%</option><option>500%</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">防火指定 <span style="color:var(--red);font-weight:700;">★ 単価に影響</span></label>
+          <select class="f-select" id="m-boka" onchange="applyBoka()">
+            <option value="なし">指定なし</option>
+            <option value="準防火">準防火地域</option>
+            <option value="防火">防火地域</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">高度地区</label>
+          <select class="f-select" id="m-koudo">
+            <option value="なし">なし</option>
+            <option>第1種高度地区</option>
+            <option>第2種高度地区</option>
+            <option>第3種高度地区</option>
+            <option>第4種高度地区</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">埋蔵文化財包蔵地 <span style="color:var(--purple);font-weight:700;">★ GRRシート工法</span></label>
+          <select class="f-select" id="m-maizo" onchange="applyMaizo()">
+            <option value="なし">なし</option>
+            <option value="あり">あり（GRRシート工法を計上）</option>
+            <option value="不明">不明（要確認）</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 自動設定されたバッジ表示 -->
+      <div id="zone-result-area" style="margin-top:14px;display:none;">
+        <div id="spec-applied" class="spec-applied">
+          <div class="sa-title">⚡ 入力内容により自動設定された仕様</div>
+          <div class="sa-items" id="spec-badges"></div>
+        </div>
+      </div>
+
+      <div class="alert alert-warn" id="boka-warn" style="margin-top:12px;display:none;">
+        ⚠️ <strong>防火・準防火地域</strong>が設定されています。サッシ・ドアは<strong>防火仕様の単価</strong>が自動適用されます。
+      </div>
+      <div class="alert alert-purple" id="maizo-warn" style="margin-top:8px;display:none;">
+        🏺 <strong>埋蔵文化財包蔵地</strong>に設定されています。<strong>GRRシート工法</strong>を見積に自動計上します。
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="goStep(1)">図面・写真の読込へ →</button>
+    </div>
+  </div>
+
+  <!-- ════ 地盤調査カード（STEP0内・独立） ════ -->
+  <div id="step-0-jiban" style="display:none;">
+
+    <div class="card">
+      <div class="card-title">🌍 地盤情報を自動取得
+        <div class="card-sub">国土地理院 公式API（無料・登録不要）</div>
+      </div>
+
+      <!-- 結果表示エリア -->
+      <div id="jiban-loading" style="display:none;padding:16px;text-align:center;">
+        <div style="display:inline-flex;align-items:center;gap:10px;color:var(--gray4);font-size:13px;">
+          <div class="spin"></div> 国土地理院APIから地形データを取得中...
+        </div>
+      </div>
+
+      <div id="jiban-result" style="display:none;">
+        <!-- 判定結果メインカード -->
+        <div id="jiban-verdict" style="border-radius:var(--r);padding:16px 20px;margin-bottom:14px;display:flex;align-items:center;gap:16px;">
+          <div id="jiban-verdict-icon" style="font-size:36px;flex-shrink:0;"></div>
+          <div>
+            <div id="jiban-verdict-title" style="font-size:16px;font-weight:900;margin-bottom:4px;"></div>
+            <div id="jiban-verdict-desc" style="font-size:12px;line-height:1.7;"></div>
+          </div>
+        </div>
+
+        <!-- 詳細データ -->
+        <div class="g3" style="margin-bottom:14px;">
+          <div style="background:var(--gray1);border-radius:var(--r);padding:12px;">
+            <div style="font-size:10px;color:var(--gray4);font-family:'JetBrains Mono',monospace;margin-bottom:4px;">地形分類（自然）</div>
+            <div id="jiban-landform" style="font-size:13px;font-weight:700;">―</div>
+          </div>
+          <div style="background:var(--gray1);border-radius:var(--r);padding:12px;">
+            <div style="font-size:10px;color:var(--gray4);font-family:'JetBrains Mono',monospace;margin-bottom:4px;">地形分類（人工）</div>
+            <div id="jiban-artificial" style="font-size:13px;font-weight:700;">―</div>
+          </div>
+          <div style="background:var(--gray1);border-radius:var(--r);padding:12px;">
+            <div style="font-size:10px;color:var(--gray4);font-family:'JetBrains Mono',monospace;margin-bottom:4px;">標高</div>
+            <div id="jiban-elev" style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;">―</div>
+          </div>
+        </div>
+
+        <!-- 地盤改良フラグ自動設定 -->
+        <div id="jiban-auto-set" style="display:none;margin-bottom:14px;"></div>
+
+        <!-- 地盤安心マップへのリンク -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button id="jiban-map-btn"
+            onclick="window.open(this.dataset.url,'_blank','noopener')"
+            data-url="https://jibannet.co.jp/map/"
+            style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--navy);color:white;border-radius:var(--r2);font-size:13px;font-weight:700;border:none;cursor:pointer;">
+            🗺️ 地盤安心マップで詳細確認
+          </button>
+          <button id="jiban-support-btn"
+            onclick="window.open(this.dataset.url,'_blank','noopener')"
+            data-url="https://sumaken.j-shield.co.jp/supportmap/"
+            style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--blue-bg);color:var(--blue);border:1.5px solid var(--blue-border);border-radius:var(--r2);font-size:13px;font-weight:700;cursor:pointer;">
+            🔍 地盤サポートマップで確認
+          </button>
+        </div>
+        <div style="font-size:10px;color:var(--gray3);margin-top:8px;">※地形分類は参考情報です。確定には専門家による地盤調査（SS試験等）が必要です。</div>
+      </div>
+
+      <div id="jiban-error" style="display:none;"></div>
+    </div>
+
+  </div>
+
+  <!-- ════ STEP 1: 図面・写真 ════ -->
+  <div id="step-1" style="display:none;">
+    <div class="card">
+      <div class="card-title">📐 図面・現場写真をアップロード <div class="card-sub">ラフ図・手書き・PDFスキャン対応</div></div>
+
+      <div class="upload-zone" id="upload-zone"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="handleDrop(event)">
+        <input type="file" accept="image/*,application/pdf" multiple onchange="handleFiles(this.files)">
+        <div class="uz-icon">📁</div>
+        <div class="uz-title">ファイルをドロップ、またはクリックして選択</div>
+        <div class="uz-sub">対応形式：JPEG・PNG・PDF・手書きスキャン / 複数枚OK</div>
+      </div>
+
+      <div class="thumb-row" id="thumb-row"></div>
+    </div>
+
+    <div class="card" id="ai-parse-card" style="display:none;">
+      <div class="card-title">🤖 AIによる図面解析結果 <div class="card-sub" id="parse-src-label"></div></div>
+      <div id="ai-parse-result"></div>
+      <div class="alert alert-warn" style="margin-top:12px;">
+        ⚠️ AI解析結果は概算です。下のステップで数値を確認・修正してください。
+      </div>
+    </div>
+
+    <!-- Claude.aiで読み取る案内 -->
+    <div class="card">
+      <div class="card-title">🤖 図面の数値をClaudeに読み取ってもらう方法</div>
+      <div style="background:var(--navy);border-radius:var(--r);padding:14px 16px;margin-bottom:12px;">
+        <div style="font-size:11px;color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;margin-bottom:8px;">HOW TO USE / 図面解析の手順</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.85);line-height:2.2;">
+          <span style="color:#4aba6a;font-weight:700;">①</span> このClaude.aiのチャットに図面の画像をアップロード<br>
+          <span style="color:#4aba6a;font-weight:700;">②</span> 「この図面から建物面積・外周長・部屋数・窓数を読み取って」と送信<br>
+          <span style="color:#4aba6a;font-weight:700;">③</span> Claudeが数値を回答 → 次のステップの入力欄に転記する
+        </div>
+        <div style="margin-top:10px;background:rgba(255,255,255,.08);border-radius:6px;padding:8px 12px;font-size:11px;color:rgba(255,255,255,.6);font-family:'JetBrains Mono',monospace;">
+          送信例：「この図面から以下を読み取ってください：建物面積(坪)・1階面積(坪)・延床面積(坪)・外周長(m)・建築面積(㎡)・腰窓数・縦滑り窓数・バルコニー窓数・クローゼット数・開き戸数・引き戸数」
+        </div>
+      </div>
+      <div class="alert alert-info">
+        💡 図面なしでも進めます。次のステップで概算値を入力すれば見積は作成できます。
+      </div>
+    </div>
+
+    <div class="btn-row-space">
+      <button class="btn btn-ghost" onclick="goStep(0)">← 戻る</button>
+      <button class="btn btn-primary" onclick="goStep(2)">仕様・数量の設定へ →</button>
+    </div>
+  </div>
+
+  <!-- ════ STEP 2: 仕様・数量設定 ════ -->
+  <div id="step-2" style="display:none;">
+
+    <div class="card">
+      <div class="card-title">🏠 建物基本情報</div>
+      <div class="g3">
+        <div>
+          <label class="f-label">構造</label>
+          <select class="f-select" id="s-kozo">
+            <option value="在来">在来工法</option>
+            <option value="ツーバイ">ツーバイフォー</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">階数</label>
+          <select class="f-select" id="s-kaisu" onchange="onKaisuChange()">
+            <option value="2">2階建て</option>
+            <option value="3">3階建て（準防火自動ON）</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">部屋数（戸数）</label>
+          <input class="f-input" type="number" id="s-heya" value="4" min="1" max="30" onchange="recalc()">
+        </div>
+        <div>
+          <label class="f-label">間取りタイプ</label>
+          <select class="f-select" id="s-madori" onchange="recalc()">
+            <option value="1K">1K</option>
+            <option value="1LDK">1LDK</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">ガス種別</label>
+          <select class="f-select" id="s-gas" onchange="recalc()">
+            <option>プロパン</option>
+            <option>都市ガス</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">地盤改良</label>
+          <select class="f-select" id="s-jiban" onchange="recalc()">
+            <option value="なし">なし</option>
+            <option value="あり">あり</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">外部鉄骨階段</label>
+          <select class="f-select" id="s-gaidan" onchange="recalc()">
+            <option value="あり">あり</option>
+            <option value="なし">なし</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">オートロック</label>
+          <select class="f-select" id="s-autolock" onchange="recalc()">
+            <option value="なし">なし</option>
+            <option value="あり">あり</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📏 面積・寸法</div>
+      <div class="g3">
+        <div>
+          <label class="f-label">建物面積・合計（坪）<span style="color:var(--gray3)"> 共用部・バルコニー含む</span></label>
+          <input class="f-input" type="number" id="s-bm" value="60" onchange="recalc()">
+        </div>
+        <div>
+          <label class="f-label">1階面積（坪）</label>
+          <input class="f-input" type="number" id="s-ik" value="20" onchange="recalc()">
+        </div>
+        <div>
+          <label class="f-label">延床面積（坪）</label>
+          <input class="f-input" type="number" id="s-nb" value="55" onchange="recalc()">
+        </div>
+        <div>
+          <label class="f-label">延床面積（㎡）<span style="color:var(--green)"> 自動</span></label>
+          <input class="f-input f-auto" type="number" id="s-nm2" readonly>
+        </div>
+        <div>
+          <label class="f-label">外周長さ（m）</label>
+          <input class="f-input" type="number" id="s-gm" value="40" onchange="recalc()">
+        </div>
+        <div>
+          <label class="f-label">建築面積（㎡）<span style="color:var(--gray3)"> 上空投影</span></label>
+          <input class="f-input" type="number" id="s-km" value="66" onchange="recalc()">
+        </div>
+        <div>
+          <label class="f-label">外壁面積（㎡）<span style="color:var(--green)"> 自動</span></label>
+          <input class="f-input f-auto" type="number" id="s-gh" readonly>
+        </div>
+        <div>
+          <label class="f-label">バルコニー面積（㎡）</label>
+          <input class="f-input" type="number" id="s-bl" value="16" onchange="recalc()">
+        </div>
+        <div>
+          <label class="f-label">共用部面積（㎡）</label>
+          <input class="f-input" type="number" id="s-ky" value="12" onchange="recalc()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🚪 建具・窓 数量</div>
+      <div class="g4">
+        <div><label class="f-label">腰窓数</label><input class="f-input" type="number" id="s-kw" value="8" onchange="recalc()"></div>
+        <div><label class="f-label">縦滑り窓数</label><input class="f-input" type="number" id="s-ts" value="4" onchange="recalc()"></div>
+        <div><label class="f-label">バルコニー窓数</label><input class="f-input" type="number" id="s-bw" value="4" onchange="recalc()"></div>
+        <div><label class="f-label">クローゼット数</label><input class="f-input" type="number" id="s-cl" value="4" onchange="recalc()"></div>
+        <div><label class="f-label">開き戸数（D）</label><input class="f-input" type="number" id="s-dn" value="12" onchange="recalc()"></div>
+        <div><label class="f-label">引き戸数（SD）</label><input class="f-input" type="number" id="s-sdn" value="4" onchange="recalc()"></div>
+        <div><label class="f-label">トイレ箇所数</label><input class="f-input" type="number" id="s-tl" value="4" onchange="recalc()"></div>
+        <div><label class="f-label">エアコン台数</label><input class="f-input" type="number" id="s-ac" value="4" onchange="recalc()"></div>
+      </div>
+    </div>
+
+    <!-- 自動設定サマリー -->
+    <div class="alert alert-warn" id="boka-alert" style="display:none;">
+      ⚠️ <strong>準防火・防火地域</strong>が設定されています。サッシ・ドアは防火仕様の単価が適用されます。
+    </div>
+    <div class="alert alert-purple" id="maizo-alert" style="display:none;">
+      🏺 <strong>埋蔵文化財包蔵地</strong>に指定されています。GRRシート工法を自動計上します。
+    </div>
+
+    <!-- 掛け率・利益率設定 -->
+    <div class="card">
+      <div class="card-title">💹 客出し単価の計算設定
+        <div class="card-sub">原価 × 掛け率 ＝ 客出し単価</div>
+      </div>
+      <div style="background:var(--navy);border-radius:var(--r);padding:12px 16px;margin-bottom:14px;font-size:12px;color:rgba(255,255,255,.8);line-height:1.9;">
+        <span style="color:#4aba6a;font-weight:700;">原価</span>（Excelの暫定単価）
+        <span style="color:rgba(255,255,255,.4);margin:0 6px;">×</span>
+        <span style="color:#fbbf24;font-weight:700;">現場管理費</span>
+        <span style="color:rgba(255,255,255,.4);margin:0 6px;">×</span>
+        <span style="color:#fbbf24;font-weight:700;">一般管理費</span>
+        <span style="color:rgba(255,255,255,.4);margin:0 6px;">×</span>
+        <span style="color:#4aba6a;font-weight:700;">利益率</span>
+        <span style="color:rgba(255,255,255,.4);margin:0 6px;">=</span>
+        <span style="color:white;font-weight:900;">客出し単価</span>
+      </div>
+      <div class="g4">
+        <div>
+          <label class="f-label">現場管理費（%）</label>
+          <input class="f-input" type="number" id="r-kanri" value="8" min="0" max="30" step="0.5" onchange="recalc()">
+          <div class="f-note">直接工事費に対する%</div>
+        </div>
+        <div>
+          <label class="f-label">一般管理費（%）</label>
+          <input class="f-input" type="number" id="r-ippan" value="5" min="0" max="20" step="0.5" onchange="recalc()">
+          <div class="f-note">本社経費・人件費等</div>
+        </div>
+        <div>
+          <label class="f-label">利益率（%）</label>
+          <input class="f-input" type="number" id="r-rieki" value="10" min="0" max="40" step="0.5" onchange="recalc()">
+          <div class="f-note">税抜原価合計に対する%</div>
+        </div>
+        <div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:10px;color:var(--green);margin-bottom:4px;">掛け率合計（概算）</div>
+          <div style="font-size:18px;font-weight:900;color:var(--green);font-family:'JetBrains Mono',monospace;" id="r-total-rate">—</div>
+          <div style="font-size:10px;color:var(--gray4);margin-top:2px;">原価に対する倍率</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row-space">
+      <button class="btn btn-ghost" onclick="goStep(1)">← 戻る</button>
+      <button class="btn btn-primary" onclick="goStep(3)">見積確認へ →</button>
+    </div>
+  </div>
+
+  <!-- ════ STEP 3: 見積確認 ════ -->
+  <div id="step-3" style="display:none;">
+
+    <div class="total-box">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="tb2-label" id="total-propname">物件名未設定</div>
+          <div class="tb2-label">見積合計（税込）</div>
+          <div class="tb2-amount" id="total-zei">¥ —</div>
+          <div class="tb2-sub" id="total-sub">税抜 ¥— ／ 消費税10% ¥—</div>
+        </div>
+        <div id="mode-genka-badge" style="display:none;">
+          <span class="badge badge-amber">📊 原価管理モード</span>
+        </div>
+      </div>
+      <div class="tb2-stats">
+        <div class="tbs-item"><div class="tbs-label">坪単価（税抜）</div><div class="tbs-val" id="tsubo-tanka">—</div></div>
+        <div class="tbs-item"><div class="tbs-label">㎡単価（税抜）</div><div class="tbs-val" id="hebe-tanka">—</div></div>
+        <div class="tbs-item"><div class="tbs-label">1戸あたり（税抜）</div><div class="tbs-val" id="ko-tanka">—</div></div>
+      </div>
+      <!-- 原価管理モード用サマリー -->
+      <div id="genka-summary-box" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.15);">
+        <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:10px;font-family:'JetBrains Mono',monospace;">COST SUMMARY / 原価サマリー</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+          <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:10px;">
+            <div style="font-size:9px;color:rgba(255,255,255,.5);margin-bottom:4px;">見積金額（税抜）</div>
+            <div style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;" id="gs-mitsu">—</div>
+          </div>
+          <div style="background:rgba(255,180,0,.15);border:1px solid rgba(255,180,0,.3);border-radius:8px;padding:10px;">
+            <div style="font-size:9px;color:rgba(255,200,100,.7);margin-bottom:4px;">原価合計</div>
+            <div style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#fbbf24;" id="gs-genka">—</div>
+          </div>
+          <div style="background:rgba(74,186,106,.15);border:1px solid rgba(74,186,106,.3);border-radius:8px;padding:10px;">
+            <div style="font-size:9px;color:rgba(100,220,130,.7);margin-bottom:4px;">粗利額</div>
+            <div style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#4aba6a;" id="gs-arari">—</div>
+          </div>
+          <div style="background:rgba(74,186,106,.15);border:1px solid rgba(74,186,106,.3);border-radius:8px;padding:10px;">
+            <div style="font-size:9px;color:rgba(100,220,130,.7);margin-bottom:4px;">粗利率</div>
+            <div style="font-size:20px;font-weight:900;font-family:'JetBrains Mono',monospace;color:#4aba6a;" id="gs-arari-pct">—</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.45);font-family:'JetBrains Mono',monospace;" id="gs-rate"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 見積内訳明細 <div class="card-sub" id="genka-mode-label"></div></div>
+      <div class="table-wrap">
+        <table class="est-table" id="est-table">
+          <thead>
+            <tr>
+              <th>No</th><th>工種</th><th>項目</th><th>算出根拠</th>
+              <th class="r">数量</th><th>単位</th>
+              <th class="r">単価</th><th class="r">金額（円）</th>
+              <th class="r" id="th-genka" style="display:none;">原価単価 <span class="genka-badge">実績</span></th>
+              <th class="r" id="th-margin" style="display:none;">粗利</th>
+            </tr>
+          </thead>
+          <tbody id="est-body"></tbody>
+          <tfoot id="est-foot"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="btn-row-space">
+      <button class="btn btn-ghost" onclick="goStep(2)">← 戻る</button>
+      <button class="btn btn-primary" onclick="goStep(4)">出力・保存へ →</button>
+    </div>
+  </div>
+
+  <!-- ════ STEP 4: 出力 ════ -->
+  <div id="step-4" style="display:none;">
+
+    <div class="output-options">
+      <div class="out-card" onclick="doExcel()">
+        <div class="oc-icon">📊</div>
+        <div class="oc-label">Excel出力</div>
+        <div class="oc-desc">表紙＋内訳明細<br>編集可能</div>
+      </div>
+      <div class="out-card" onclick="doPrint()">
+        <div class="oc-icon">🖨️</div>
+        <div class="oc-label">印刷 / PDF保存</div>
+        <div class="oc-desc">ブラウザの印刷から<br>PDF出力も可</div>
+      </div>
+      <div class="out-card" onclick="doSaveJson()">
+        <div class="oc-icon">💾</div>
+        <div class="oc-label">案件データ保存</div>
+        <div class="oc-desc">JSON形式で保存<br>後で再読込可</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📄 出力内容プレビュー</div>
+      <div id="output-preview"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📂 保存済み案件を読み込む</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <input type="file" accept=".json" onchange="loadJson(this)" style="font-size:12px;flex:1;">
+        <button class="btn btn-ghost btn-sm" onclick="clearAll()">🗑️ リセット</button>
+      </div>
+    </div>
+
+    <!-- 単価マスター編集 -->
+    <div class="card">
+      <div class="card-title">🔧 単価マスター編集
+        <div class="card-sub">原価を直接編集 → 保存ボタンで次回も反映</div>
+      </div>
+
+      <div style="background:var(--navy);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:12px;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:12px;">
+        <span>💾 ブラウザに保存されます（このPC・このブラウザで次回も有効）</span>
+        <span id="master-saved-at" style="font-size:10px;color:rgba(255,255,255,.4);font-family:'JetBrains Mono',monospace;margin-left:auto;"></span>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="saveMaster()">💾 単価マスターを保存</button>
+        <button class="btn btn-outline" onclick="resetMaster()">↩️ 初期値に戻す</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportMasterJson()">📤 マスターをエクスポート</button>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;">
+          📥 マスターをインポート
+          <input type="file" accept=".json" onchange="importMasterJson(this)" style="display:none;">
+        </label>
+      </div>
+
+      <div class="table-wrap">
+        <table class="est-table" id="master-table">
+          <thead>
+            <tr>
+              <th style="width:30px;">No</th>
+              <th>工種</th>
+              <th>項目名</th>
+              <th class="r" style="width:130px;">原価単価（円）<br><span style="font-size:9px;color:var(--amber);">★ここを編集</span></th>
+              <th style="width:50px;">単位</th>
+              <th class="r" style="width:100px;">掛け後単価</th>
+            </tr>
+          </thead>
+          <tbody id="master-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔖 バージョン更新履歴</div>
+      <div class="version-log">
+        <div class="vl-entry"><span class="vl-ver">v1.0.6</span><span class="vl-date">2026-06-09</span><span>国土地理院APIで地形分類を自動取得→地盤改良要否を自動判定。地盤安心マップ・地盤サポートマップへのリンクを追加</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.5</span><span class="vl-date">2026-06-09</span><span>単価マスター編集・保存機能を追加。ブラウザに保存され次回も反映</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.4</span><span class="vl-date">2026-06-09</span><span>原価×掛け率（管理費・一般管理費・利益率）で客出し単価を自動計算する機能を追加</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.3</span><span class="vl-date">2026-06-09</span><span>鹿野二丁目67-20暫定見積Excelを原価マスターとして反映</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.2</span><span class="vl-date">2026-06-09</span><span>都市計画を手動入力UIに変更。原価合計・粗利率サマリーを追加</span></div>
+        <div class="vl-entry"><span class="vl-ver">v1.0.0</span><span class="vl-date">2026-06-09</span><span>初版リリース</span></div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--gray4);">
+        次バージョン予定：v1.1.0 — 利益率設定・単価マスター編集・PDF表紙デザイン
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ════ PRINT STYLES ════ -->
+<style>
+@media print {
+  .topbar,.step-nav,.btn,.btn-row,.btn-row-space,.output-options{display:none!important;}
+  .main{max-width:100%;padding:0;}
+  .card{box-shadow:none;border:1px solid #ccc;break-inside:avoid;}
+  .total-box{background:var(--navy)!important;-webkit-print-color-adjust:exact;}
+  body{background:white;}
+}
+</style>
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+const VERSION = "1.0.6";
+document.getElementById('version-badge').textContent = 'v' + VERSION;
+
+const S = {
+  step: 0,
+  mode: 'estimate', // 'estimate' | 'genka'
+  zoning: null,
+  specFlags: { junboka: false, maizo: false },
+  uploadedFiles: [],
+  uploadedDataURLs: [],
+  estimate: null,
+};
+
+// ════════════════════════════════════════
+// STEP NAVIGATION
+// ════════════════════════════════════════
+function goStep(n) {
+  document.getElementById('step-' + S.step).style.display = 'none';
+  document.getElementById('step-' + n).style.display = 'block';
+  for (let i = 0; i < 5; i++) {
+    const el = document.getElementById('sn-' + i);
+    el.className = 'step-item ' + (i === n ? 'active' : i < n ? 'done' : 'inactive');
+  }
+  S.step = n;
+  if (n === 3) renderEstimate();
+  if (n === 4) { renderOutputPreview(); renderMasterTable(); }
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// ════════════════════════════════════════
+// MODE SWITCH
+// ════════════════════════════════════════
+function setMode(mode) {
+  S.mode = mode;
+  document.getElementById('btn-mode-est').className = 'mode-btn ' + (mode === 'estimate' ? 'active' : 'inactive');
+  document.getElementById('btn-mode-gen').className = 'mode-btn ' + (mode === 'genka' ? 'active' : 'inactive');
+  document.getElementById('mode-genka-badge').style.display = mode === 'genka' ? 'block' : 'none';
+  document.getElementById('th-genka').style.display = mode === 'genka' ? '' : 'none';
+  document.getElementById('th-margin').style.display = mode === 'genka' ? '' : 'none';
+  document.getElementById('genka-mode-label').textContent = mode === 'genka' ? '📊 原価・粗利表示中' : '';
+  const gsBox = document.getElementById('genka-summary-box');
+  if (gsBox) gsBox.style.display = mode === 'genka' ? 'block' : 'none';
+  if (S.step === 3) renderEstimate();
+  toast(mode === 'genka' ? '📊 原価管理モードに切替えました' : '📋 見積モードに切替えました');
+}
+
+// ════════════════════════════════════════
+// 地盤情報自動取得（国土地理院 公式API）
+// ════════════════════════════════════════
+
+// 地形分類 → 地盤改良リスク判定テーブル
+const LANDFORM_RISK = {
+  // リスク高（改良ほぼ必須）
+  '谷底低地': {risk:'high', label:'⚠️ 軟弱地盤の可能性が高い', jiban:'あり'},
+  '旧河道':   {risk:'high', label:'⚠️ 旧河道・軟弱地盤', jiban:'あり'},
+  '後背湿地': {risk:'high', label:'⚠️ 後背湿地・軟弱地盤', jiban:'あり'},
+  '沼・池':   {risk:'high', label:'⚠️ 沼・池跡・要改良', jiban:'あり'},
+  '湿地':     {risk:'high', label:'⚠️ 湿地・要地盤改良', jiban:'あり'},
+  '干拓地':   {risk:'high', label:'⚠️ 干拓地・軟弱地盤', jiban:'あり'},
+  '埋立地':   {risk:'high', label:'⚠️ 埋立地・要改良', jiban:'あり'},
+  // リスク中（要確認）
+  '自然堤防': {risk:'mid', label:'△ 自然堤防・調査推奨', jiban:'不明'},
+  '扇状地':   {risk:'mid', label:'△ 扇状地・局所的に要確認', jiban:'不明'},
+  '氾濫平野': {risk:'mid', label:'△ 氾濫平野・調査推奨', jiban:'不明'},
+  '河川敷':   {risk:'mid', label:'△ 河川敷・要確認', jiban:'不明'},
+  '海岸平野': {risk:'mid', label:'△ 海岸平野・確認推奨', jiban:'不明'},
+  '砂州・砂丘':{risk:'mid', label:'△ 砂州・砂丘・確認推奨', jiban:'不明'},
+  // リスク低（概ね不要）
+  '台地':     {risk:'low', label:'✅ 台地・地盤良好の傾向', jiban:'なし'},
+  '段丘':     {risk:'low', label:'✅ 段丘・地盤良好の傾向', jiban:'なし'},
+  '丘陵':     {risk:'low', label:'✅ 丘陵・地盤良好の傾向', jiban:'なし'},
+  '山地':     {risk:'low', label:'✅ 山地・地盤良好の傾向', jiban:'なし'},
+  '山麓':     {risk:'low', label:'✅ 山麓・概ね良好', jiban:'なし'},
+};
+
+// 緯度経度 → タイルXY座標変換
+function latlngToTile(lat, lng, zoom) {
+  const x = Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
+  const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
+  return {x, y};
+}
+
+async function fetchJiban() {
+  const addr = document.getElementById('prop-address').value.trim();
+  if (!addr) { toast('先に住所を入力してください'); return; }
+
+  // カードを表示してローディング
+  document.getElementById('step-0-jiban').style.display = 'block';
+  document.getElementById('jiban-loading').style.display = 'block';
+  document.getElementById('jiban-result').style.display = 'none';
+  document.getElementById('jiban-error').style.display = 'none';
+  document.getElementById('step-0-jiban').scrollIntoView({behavior:'smooth', block:'start'});
+
+  try {
+    // ① 住所→緯度経度（国土地理院ジオコーダ）
+    const geoRes = await fetch(
+      `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(addr)}`
+    );
+    const geoData = await geoRes.json();
+    if (!geoData || geoData.length === 0) throw new Error('住所が見つかりませんでした');
+
+    const [lng, lat] = geoData[0].geometry.coordinates;
+
+    // ② 標高取得
+    let elev = '―';
+    try {
+      const elevRes = await fetch(
+        `https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lng}&lat=${lat}&outtype=JSON`
+      );
+      const elevData = await elevRes.json();
+      if (elevData.elevation !== null) elev = elevData.elevation.toFixed(1) + ' m';
+    } catch(e) {}
+
+    // ③ 地形分類（自然地形）GeoJSONタイル取得
+    const zoom = 14;
+    const tile = latlngToTile(lat, lng, zoom);
+    let landformNatural = '情報なし', landformArtificial = '情報なし';
+
+    try {
+      const lfRes1 = await fetch(
+        `https://cyberjapandata.gsi.go.jp/xyz/experimental_landformclassification1/${zoom}/${tile.x}/${tile.y}.geojson`
+      );
+      if (lfRes1.ok) {
+        const lfData1 = await lfRes1.json();
+        if (lfData1.features && lfData1.features.length > 0) {
+          const feat = lfData1.features[0];
+          landformNatural = feat.properties?.description || feat.properties?.class || '取得済';
+        }
+      }
+    } catch(e) {}
+
+    try {
+      const lfRes2 = await fetch(
+        `https://cyberjapandata.gsi.go.jp/xyz/experimental_landformclassification2/${zoom}/${tile.x}/${tile.y}.geojson`
+      );
+      if (lfRes2.ok) {
+        const lfData2 = await lfRes2.json();
+        if (lfData2.features && lfData2.features.length > 0) {
+          const feat = lfData2.features[0];
+          landformArtificial = feat.properties?.description || feat.properties?.class || '取得済';
+        }
+      }
+    } catch(e) {}
+
+    // ④ リスク判定
+    const combined = landformNatural + ' ' + landformArtificial;
+    let verdict = {risk:'unknown', label:'📋 地盤データ取得済・要専門調査', jiban:'不明'};
+    for (const [key, val] of Object.entries(LANDFORM_RISK)) {
+      if (combined.includes(key)) { verdict = val; break; }
+    }
+
+    // ⑤ 結果表示
+    document.getElementById('jiban-loading').style.display = 'none';
+    document.getElementById('jiban-result').style.display = 'block';
+    document.getElementById('jiban-landform').textContent   = landformNatural;
+    document.getElementById('jiban-artificial').textContent = landformArtificial;
+    document.getElementById('jiban-elev').textContent       = elev;
+
+    // 判定カード色
+    const vEl = document.getElementById('jiban-verdict');
+    const colors = {
+      high:    {bg:'var(--red-bg)',    border:'var(--red)',    icon:'🔴'},
+      mid:     {bg:'var(--amber-bg)',  border:'var(--amber)',  icon:'🟡'},
+      low:     {bg:'var(--green-bg)',  border:'var(--green)',  icon:'🟢'},
+      unknown: {bg:'var(--blue-bg)',   border:'var(--blue)',   icon:'🔵'},
+    };
+    const c = colors[verdict.risk] || colors.unknown;
+    vEl.style.background   = c.bg;
+    vEl.style.border       = `1.5px solid ${c.border}`;
+    document.getElementById('jiban-verdict-icon').textContent = c.icon;
+    document.getElementById('jiban-verdict-title').textContent = verdict.label;
+    document.getElementById('jiban-verdict-desc').innerHTML =
+      `地形分類：<strong>${landformNatural}</strong>（人工地形：${landformArtificial}）、標高：${elev}<br>` +
+      `取得元：国土地理院 地形分類ベクトルタイル（座標：${lat.toFixed(5)}, ${lng.toFixed(5)}）`;
+
+    // 地盤改良フラグ自動設定
+    if (verdict.jiban !== '不明') {
+      const autoEl = document.getElementById('jiban-auto-set');
+      autoEl.style.display = 'block';
+      autoEl.innerHTML = `
+        <div class="alert ${verdict.jiban==='あり'?'alert-warn':'alert-ok'}">
+          <strong>${verdict.jiban==='あり'?'⚠️ 地盤改良「あり」として見積に自動設定します':'✅ 地盤改良「なし」として見積に設定します'}</strong><br>
+          <span style="font-size:11px;">STEP03の「地盤改良」設定に反映されます。変更可能です。</span>
+          <div style="margin-top:8px;">
+            <button class="btn btn-sm ${verdict.jiban==='あり'?'btn-danger':'btn-success'}"
+              onclick="applyJibanFlag('${verdict.jiban}')">
+              ${verdict.jiban==='あり'?'⚠️ 地盤改良あり で設定':'✅ 地盤改良なし で設定'}
+            </button>
+          </div>
+        </div>`;
+    }
+
+    // 外部ボタンのURL更新（住所付き）
+    const encAddr = encodeURIComponent(addr);
+    const mapBtn = document.getElementById('jiban-map-btn');
+    const supBtn = document.getElementById('jiban-support-btn');
+    if (mapBtn) mapBtn.dataset.url = `https://jibannet.co.jp/map/?search=${encAddr}`;
+    if (supBtn) supBtn.dataset.url = `https://sumaken.j-shield.co.jp/supportmap/?search=${encAddr}`;
+
+    toast('🌍 地盤情報を取得しました');
+
+  } catch(e) {
+    document.getElementById('jiban-loading').style.display = 'none';
+    document.getElementById('jiban-error').style.display = 'block';
+    document.getElementById('jiban-error').innerHTML = `
+      <div class="alert alert-err">
+        ❌ ${e.message || '地盤情報の取得に失敗しました'}<br>
+        <span style="font-size:11px;">下のボタンから手動で確認してください。</span>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="window.open('https://jibannet.co.jp/map/','_blank','noopener')"
+            style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--navy);color:white;border-radius:var(--r2);font-size:12px;font-weight:700;border:none;cursor:pointer;">
+            🗺️ 地盤安心マップを開く
+          </button>
+          <button onclick="window.open('https://sumaken.j-shield.co.jp/supportmap/','_blank','noopener')"
+            style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);border-radius:var(--r2);font-size:12px;font-weight:700;cursor:pointer;">
+            🔍 地盤サポートマップを開く
+          </button>
+        </div>
+      </div>`;
+    toast('住所から座標を取得できませんでした');
+  }
+}
+
+function applyJibanFlag(val) {
+  // STEP03の地盤改良セレクトに反映
+  const el = document.getElementById('s-jiban');
+  if (el) { el.value = val; recalc(); }
+  toast(val === 'あり' ? '⚠️ 地盤改良「あり」を設定しました' : '✅ 地盤改良「なし」を設定しました');
+}
+  const addr = document.getElementById('prop-address').value.trim();
+  if (!addr) { toast('住所を入力してください'); return; }
+
+  document.getElementById('parse-card').style.display = 'block';
+  document.getElementById('zone-result-area').style.display = 'none';
+  setStatus('loading', 'AI解析中...');
+
+  const steps = [
+    { label: '住所を解析中...', val: addr.slice(0, 20) },
+    { label: '都市計画情報をWeb検索中...', val: '' },
+    { label: '防火・用途地域を確認中...', val: '' },
+    { label: '仕様を自動設定中...', val: '' },
+  ];
+  // アニメ開始
+  animateParseSteps(steps, 0);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{
+          role: 'user',
+          content: `以下の住所について都市計画情報をWeb検索して調べてください。\n住所：${addr}\n\n結果を以下のJSON形式のみで返してください（他の文章不要）：\n{"yoto":"用途地域名","kenpei":"建ぺい率（例:60%）","yoseki":"容積率（例:200%）","boka":"防火地域の種別（防火地域/準防火地域/指定なし）","koudo":"高度地区（なし/第○種高度地区）","maizo":"埋蔵文化財包蔵地（あり/なし/不明）","chiku":"地区計画（あり/なし）","notes":"その他特記事項"}`
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content || []).map(c => c.text || '').join('');
+    const m = text.match(/\{[\s\S]*?\}/);
+    if (!m) throw new Error('parse error');
+    const info = JSON.parse(m[0]);
+    S.zoning = info;
+    completeParseSteps(steps, info);
+    showZoningResult(info);
+    applyZoningSpec(info);
+    setStatus('ok', '取得完了');
+  } catch (e) {
+    failParseStep();
+    setStatus('err', '取得失敗');
+    document.getElementById('manual-zone-card').style.display = 'block';
+    toast('都市計画情報の取得に失敗しました。手動で設定してください。');
+  }
+}
+
+function animateParseSteps(steps, idx) {
+  if (idx >= steps.length) return;
+  const pd = document.getElementById('pd-' + idx);
+  const pl = document.getElementById('pl-' + idx);
+  pd.className = 'ps-dot running';
+  pl.className = 'ps-label';
+  pl.textContent = steps[idx].label;
+}
+
+function completeParseSteps(steps, info) {
+  const vals = [
+    document.getElementById('prop-address').value.slice(0, 16) + '…',
+    info.yoto || '取得済',
+    info.boka || '確認済',
+    '設定完了',
+  ];
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('pd-' + i).className = 'ps-dot done';
+    document.getElementById('pl-' + i).className = 'ps-label done';
+    document.getElementById('pv-' + i).textContent = vals[i];
+  }
+}
+
+function failParseStep() {
+  for (let i = 0; i < 4; i++) {
+    const pd = document.getElementById('pd-' + i);
+    if (!pd.classList.contains('done')) { pd.className = 'ps-dot err'; break; }
+  }
+}
+
+function showZoningResult(info) {
+  document.getElementById('zone-result-area').style.display = 'block';
+  document.getElementById('zr-name').textContent = info.yoto || '不明';
+  document.getElementById('zr-kenpei').textContent = info.kenpei || '―';
+  document.getElementById('zr-yoseki').textContent = info.yoseki || '―';
+  document.getElementById('zr-boka').textContent = info.boka || '―';
+  document.getElementById('zr-koudo').textContent = info.koudo || '―';
+  document.getElementById('zr-maizo').textContent = info.maizo || '―';
+  document.getElementById('zr-chiku').textContent = info.chiku || '―';
+  if (info.notes) {
+    const el = document.getElementById('zone-notes');
+    el.style.display = 'block';
+    el.textContent = '📌 ' + info.notes;
+  }
+}
+
+function applyZoningSpec(info) {
+  const badges = [];
+  S.specFlags.junboka = false;
+  S.specFlags.maizo = false;
+
+  if (info.boka === '防火地域' || info.boka === '準防火地域') {
+    S.specFlags.junboka = true;
+    badges.push({ label: (info.boka === '防火地域' ? '🔥 防火地域' : '⚠️ 準防火地域') + ' → 防火サッシ・防火ドアに自動変更', cls: 'badge-red' });
+  }
+  if (info.maizo === 'あり') {
+    S.specFlags.maizo = true;
+    badges.push({ label: '🏺 埋蔵文化財包蔵地 → GRRシート工法を自動計上', cls: 'badge-purple' });
+  }
+  if (info.koudo && info.koudo !== 'なし') {
+    badges.push({ label: '📐 高度地区：' + info.koudo, cls: 'badge-blue' });
+  }
+
+  const sa = document.getElementById('spec-applied');
+  if (badges.length) {
+    sa.style.display = 'block';
+    document.getElementById('spec-badges').innerHTML = badges.map(b => `<span class="badge ${b.cls}">${b.label}</span>`).join('');
+  }
+  updateAlerts();
+}
+
+function showManualZone() {
+  document.getElementById('manual-zone-card').style.display = 'block';
+}
+
+function applyBoka() {
+  const v = document.getElementById('m-boka').value;
+  S.specFlags.junboka = (v !== 'なし');
+  updateAlerts();
+}
+
+function applyMaizo() {
+  const v = document.getElementById('m-maizo').value;
+  S.specFlags.maizo = (v === 'あり');
+  updateAlerts();
+}
+
+function updateAlerts() {
+  // STEP0の警告
+  const bw = document.getElementById('boka-warn');
+  const mw = document.getElementById('maizo-warn');
+  if (bw) bw.style.display = S.specFlags.junboka ? 'block' : 'none';
+  if (mw) mw.style.display = S.specFlags.maizo ? 'block' : 'none';
+
+  // STEP2の警告
+  const ba = document.getElementById('boka-alert');
+  const ma = document.getElementById('maizo-alert');
+  if (ba) ba.style.display = S.specFlags.junboka ? 'block' : 'none';
+  if (ma) ma.style.display = S.specFlags.maizo ? 'block' : 'none';
+
+  // バッジ表示
+  const badges = [];
+  if (S.specFlags.junboka) badges.push({label:'⚠️ 防火・準防火地域 → 防火サッシ・防火ドアに自動変更', cls:'badge-red'});
+  if (S.specFlags.maizo)   badges.push({label:'🏺 埋蔵文化財包蔵地 → GRRシート工法を自動計上', cls:'badge-purple'});
+  const sb = document.getElementById('spec-badges');
+  const za = document.getElementById('zone-result-area');
+  if (sb && za) {
+    sb.innerHTML = badges.map(b=>`<span class="badge ${b.cls}">${b.label}</span>`).join('');
+    za.style.display = badges.length ? 'block' : 'none';
+  }
+}
+
+function onKaisuChange() {
+  const k = parseInt(document.getElementById('s-kaisu').value);
+  if (k === 3) { S.specFlags.junboka = true; updateAlerts(); }
+  recalc();
+}
+
+// ════════════════════════════════════════
+// STEP 1: 図面アップロード・AI解析
+// ════════════════════════════════════════
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+}
+
+function handleFiles(files) {
+  for (const f of files) {
+    if (!f.type.startsWith('image/') && f.type !== 'application/pdf') continue;
+    S.uploadedFiles.push(f);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      S.uploadedDataURLs.push(ev.target.result);
+      renderThumbs();
+    };
+    reader.readAsDataURL(f);
+  }
+  document.getElementById('btn-parse').disabled = S.uploadedFiles.length === 0;
+}
+
+function renderThumbs() {
+  const row = document.getElementById('thumb-row');
+  row.innerHTML = S.uploadedDataURLs.map((url, i) => `
+    <div class="thumb">
+      <img src="${url}" alt="図面${i+1}">
+      <button class="thumb-del" onclick="removeFile(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removeFile(i) {
+  S.uploadedFiles.splice(i, 1);
+  S.uploadedDataURLs.splice(i, 1);
+  renderThumbs();
+  document.getElementById('btn-parse').disabled = S.uploadedFiles.length === 0;
+}
+
+async function parseDrawings() {
+  if (!S.uploadedDataURLs.length) return;
+  showOverlay('図面をAIが解析中...', 'ラフ図・手書き図面から寸法・間取りを読み取ります');
+  setStatus('loading', '図面解析中...');
+
+  try {
+    // 画像をbase64に変換してAPIへ
+    const imageContents = S.uploadedDataURLs
+      .filter(url => url.startsWith('data:image/'))
+      .slice(0, 3) // 最大3枚
+      .map(url => {
+        const [meta, b64] = url.split(',');
+        const mt = meta.match(/data:([^;]+)/)[1];
+        return { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } };
+      });
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1200,
+        messages: [{
+          role: 'user',
+          content: [
+            ...imageContents,
+            { type: 'text', text: `この図面（木造アパート）から以下の情報を読み取ってください。ラフ図や手書きでも可能な限り読み取り、不明な項目は「不明」と答えてください。\n\n結果をJSON形式のみで返してください：\n{"kaisu":"階数(2 or 3)","heya":"部屋数(戸数)","madori":"間取りタイプ(1K/1LDK)","bm":"建物面積合計(坪)","ik":"1階面積(坪)","nb":"延床面積(坪)","gm":"外周長さ(m)","km":"建築面積(㎡)","kw":"腰窓数","ts":"縦滑り窓数","bw":"バルコニー窓数","cl":"クローゼット数","dn":"開き戸数","sdn":"引き戸数","notes":"読み取ったその他特記事項"}` }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content || []).map(c => c.text || '').join('');
+    const m = text.match(/\{[\s\S]*?\}/);
+    if (!m) throw new Error('parse error');
+    const parsed = JSON.parse(m[0]);
+
+    // 値をフォームに反映
+    const fields = { kaisu:'s-kaisu', heya:'s-heya', bm:'s-bm', ik:'s-ik', nb:'s-nb', gm:'s-gm', km:'s-km', kw:'s-kw', ts:'s-ts', bw:'s-bw', cl:'s-cl', dn:'s-dn', sdn:'s-sdn' };
+    let applied = [];
+    for (const [key, id] of Object.entries(fields)) {
+      const val = parsed[key];
+      if (val && val !== '不明') {
+        const el = document.getElementById(id);
+        if (el) { el.value = val; el.classList.add('f-auto'); applied.push(key); }
+      }
+    }
+    if (parsed.madori) {
+      const el = document.getElementById('s-madori');
+      if (el) el.value = parsed.madori;
+    }
+    recalc();
+
+    // 結果表示
+    document.getElementById('parse-src-label').textContent = `${S.uploadedFiles.length}枚の図面を解析`;
+    document.getElementById('ai-parse-result').innerHTML = `
+      <div class="alert alert-ok">✅ ${applied.length}項目を図面から読み取りました。次のステップで確認・修正してください。</div>
+      ${parsed.notes ? `<div class="alert alert-info">📌 ${parsed.notes}</div>` : ''}
+      <div class="g3">
+        ${applied.map(k => `<div><span class="badge badge-green">${k}</span></div>`).join('')}
+      </div>`;
+    document.getElementById('ai-parse-card').style.display = 'block';
+    setStatus('ok', '図面解析完了');
+    toast('図面の解析が完了しました');
+  } catch (e) {
+    document.getElementById('ai-parse-result').innerHTML = `<div class="alert alert-err">❌ 解析に失敗しました。手動で数値を入力してください。</div>`;
+    document.getElementById('ai-parse-card').style.display = 'block';
+    setStatus('err', '解析失敗');
+  } finally {
+    hideOverlay();
+  }
+}
+
+function skipParse() { goStep(2); }
+
+// ════════════════════════════════════════
+// STEP 2: 自動計算
+// ════════════════════════════════════════
+function recalc() {
+  const nb = parseFloat(document.getElementById('s-nb').value) || 0;
+  const gm = parseFloat(document.getElementById('s-gm').value) || 0;
+  const k = parseInt(document.getElementById('s-kaisu').value) || 2;
+  document.getElementById('s-nm2').value = (nb * 3.30579).toFixed(1);
+  document.getElementById('s-gh').value = (gm * (k === 2 ? 7 : 9.5)).toFixed(1);
+
+  // 掛け率合計表示
+  const kanri = parseFloat(document.getElementById('r-kanri')?.value || 8) / 100;
+  const ippan = parseFloat(document.getElementById('r-ippan')?.value || 5) / 100;
+  const rieki = parseFloat(document.getElementById('r-rieki')?.value || 10) / 100;
+  const rate = (1 + kanri) * (1 + ippan) * (1 + rieki);
+  const el = document.getElementById('r-total-rate');
+  if (el) el.textContent = rate.toFixed(3) + ' 倍';
+}
+
+function getParams() {
+  const v = id => document.getElementById(id);
+  return {
+    name:    v('prop-name').value,
+    address: v('prop-address').value,
+    kozo:    v('s-kozo').value,
+    kaisu:   parseInt(v('s-kaisu').value) || 2,
+    heya:    parseInt(v('s-heya').value) || 4,
+    madori:  v('s-madori').value,
+    gas:     v('s-gas').value,
+    jiban:   v('s-jiban').value,
+    gaidan:  v('s-gaidan').value,
+    autolock:v('s-autolock').value,
+    bm:      parseFloat(v('s-bm').value) || 0,
+    ik:      parseFloat(v('s-ik').value) || 0,
+    nb:      parseFloat(v('s-nb').value) || 0,
+    gm:      parseFloat(v('s-gm').value) || 0,
+    km:      parseFloat(v('s-km').value) || 0,
+    bl:      parseFloat(v('s-bl').value) || 0,
+    ky:      parseFloat(v('s-ky').value) || 0,
+    kw:      parseInt(v('s-kw').value) || 0,
+    ts:      parseInt(v('s-ts').value) || 0,
+    bw:      parseInt(v('s-bw').value) || 0,
+    cl:      parseInt(v('s-cl').value) || 0,
+    dn:      parseInt(v('s-dn').value) || 0,
+    sdn:     parseInt(v('s-sdn').value) || 0,
+    tl:      parseInt(v('s-tl').value) || 0,
+    ac:      parseInt(v('s-ac').value) || 0,
+    junboka: S.specFlags.junboka,
+    maizo:   S.specFlags.maizo,
+    // 掛け率設定
+    kanri:   parseFloat(v('r-kanri')?.value || 8) / 100,
+    ippan:   parseFloat(v('r-ippan')?.value || 5) / 100,
+    rieki:   parseFloat(v('r-rieki')?.value || 10) / 100,
+  };
+}
+
+// ════════════════════════════════════════
+// 見積計算エンジン
+// tanka = 客出し見積単価（暫定見積Excelより）
+// genka = 原価（仕入・外注コスト）
+// ════════════════════════════════════════
+function calcEstimate(p) {
+  const h = p.heya, k = p.kaisu;
+  const boka = p.junboka || k >= 3;
+  const T = 3.30579;
+  const nm2 = p.nb * T;
+  const gh  = p.gm * (k === 2 ? 7 : 9.5);
+  const gt  = gh / T;
+  const t1  = p.ik * T;
+  const t2  = p.ik * T;
+  const kh  = h * 2.4 * (nm2 / Math.max(h,1) / 5);
+  const mj  = h * 2.4 * 4;
+  const y2  = (p.bm - p.ik) * T;
+  const isZ = p.kozo === '在来';
+  const isL = p.madori === '1LDK';
+  const gas170 = p.gas === '都市ガス';
+
+  // 部屋数スケール係数（暫定見積は9部屋想定なので比率で調整）
+  const hRatio = h / 9;
+  const bRatio = p.bm / 112.59;  // 暫定見積の施工面積基準
+
+  const rows = [
+    // ── 仮設・共通 ──
+    {cat:'仮設・共通',  name:'仮設足場',            basis:'外周長×1.1×高さ',    qty:p.gm*1.1*(k===2?7:9.5), unit:'㎡',   tanka:800,    genka:620},
+    {cat:'仮設・共通',  name:'共通仮設費用',         basis:'1棟固定',             qty:1,                      unit:'式',   tanka:500000, genka:380000},
+    {cat:'仮設・共通',  name:'完成後クリーニング',   basis:'延床面積×400',        qty:nm2,                    unit:'㎡',   tanka:400,    genka:300},
+    {cat:'仮設・共通',  name:'外部借上駐車場',       basis:'1現場固定',           qty:1,                      unit:'式',   tanka:800000, genka:800000},
+    {cat:'仮設・共通',  name:'産廃',                 basis:'施工面積（坪）',      qty:p.bm*1.078,             unit:'坪',   tanka:9000,   genka:7000},
+    // ── 基礎・地盤 ──
+    {cat:'基礎・地盤',  name:'基礎工事（3階建）',   basis:'基礎面積（坪）',      qty:p.ik*1.079,             unit:'坪',   tanka:85000,  genka:62000},
+    {cat:'基礎・地盤',  name:'地盤改良',             basis:p.jiban==='あり'?'あり':'なし(0)', qty:p.jiban==='あり'?1:0, unit:'式', tanka:1500000, genka:1200000},
+    // ── 構造・木工事 ──
+    {cat:'構造・木工事',name:'建て方（在来）',       basis:'施工面積（坪）',      qty:p.bm*1.078,             unit:'坪',   tanka:isZ?11000:(k===3?13000:12000), genka:isZ?8000:(k===3?9500:8800)},
+    {cat:'構造・木工事',name:'木材（在来）',         basis:'施工面積（坪）',      qty:p.bm*1.078,             unit:'坪',   tanka:isZ?75000:86000, genka:isZ?58000:67000},
+    {cat:'構造・木工事',name:'防水材・点検口',       basis:'1棟固定',             qty:1,                      unit:'式',   tanka:300000, genka:230000},
+    {cat:'構造・木工事',name:'内部造作（在来）',     basis:'延床面積（坪）',      qty:p.nb,                   unit:'坪',   tanka:isZ?33000:25000, genka:isZ?24000:18500},
+    {cat:'構造・木工事',name:'共用部造作',           basis:'1棟固定',             qty:1,                      unit:'式',   tanka:500000, genka:380000},
+    // ── 設備 ──
+    {cat:'設備',        name:'換気材',               basis:'部屋数',              qty:h,                      unit:'部屋', tanka:19000,  genka:14000},
+    {cat:'設備',        name:'電気配線工事',         basis:'部屋数',              qty:h,                      unit:'部屋', tanka:360000, genka:280000},
+    {cat:'設備',        name:'給排水工事',           basis:'部屋数',              qty:h,                      unit:'部屋', tanka:500000, genka:390000},
+    {cat:'設備',        name:'室外物干し',           basis:'部屋数（バルコニー）', qty:h,                     unit:'部屋', tanka:9400,   genka:7200},
+    {cat:'設備',        name:'室内物干し',           basis:'部屋数',              qty:h,                      unit:'部屋', tanka:6600,   genka:5000},
+    {cat:'設備',        name:'火災報知器',           basis:'部屋数',              qty:h,                      unit:'部屋', tanka:3900,   genka:3000},
+    {cat:'設備',        name:'非常照明・消火器等',   basis:'1棟固定',             qty:1,                      unit:'式',   tanka:100000, genka:78000},
+    {cat:'設備',        name:'給湯器',               basis:'部屋数',              qty:h,                      unit:'部屋', tanka:63000,  genka:48000},
+    {cat:'設備',        name:'ガス工事',             basis:gas170?'都市ガス':'プロパン', qty:h,               unit:'部屋', tanka:gas170?170000:35000, genka:gas170?130000:26000},
+    // ── 断熱材 ──
+    {cat:'断熱材',      name:'各階外周部断熱材',     basis:'外周面積概算÷3',      qty:Math.round(43*hRatio),  unit:'本',   tanka:5250,   genka:4000},
+    {cat:'断熱材',      name:'界壁断熱材',           basis:'界壁面積概算÷1.5',    qty:Math.round(24*hRatio),  unit:'本',   tanka:6550,   genka:5000},
+    {cat:'断熱材',      name:'各階天井断熱材',       basis:'延床坪÷3',            qty:Math.round(35*hRatio),  unit:'本',   tanka:5250,   genka:4000},
+    // ── 石膏ボード ──
+    {cat:'石膏ボード',  name:'外周部石膏ボード（3F）',basis:'外周㎡÷2.2022',      qty:Math.round(196*bRatio), unit:'枚',   tanka:1500,   genka:1150},
+    {cat:'石膏ボード',  name:'界壁石膏ボード',       basis:'両面二重張り÷2.2022', qty:Math.round(212*hRatio), unit:'枚',   tanka:720,    genka:560},
+    {cat:'石膏ボード',  name:'1F天井石膏ボード（3F）',basis:'天井㎡÷1.6562',      qty:Math.round(60*bRatio),  unit:'枚',   tanka:1100,   genka:850},
+    {cat:'石膏ボード',  name:'2F天井石膏ボード（3F）',basis:'天井㎡÷1.6562',      qty:Math.round(60*bRatio),  unit:'枚',   tanka:1100,   genka:850},
+    ...(k===3?[{cat:'石膏ボード',name:'3F天井石膏ボード',basis:'天井㎡÷1.6562',qty:Math.round(60*bRatio),unit:'枚',tanka:540,genka:420}]:[]),
+    {cat:'石膏ボード',  name:'間仕切り石膏ボード（3F）',basis:'間仕切り㎡÷2.2022', qty:Math.round(180*hRatio),unit:'枚',   tanka:1500,   genka:1150},
+    {cat:'石膏ボード',  name:'遮音シート',           basis:'界壁㎡÷9.1',          qty:Math.round(26*hRatio),  unit:'本',   tanka:2700,   genka:2050},
+    // ── 床材 ──
+    {cat:'床材',        name:'ユカテック（2・3F）',  basis:'床面積÷1.10292',      qty:Math.round(181*bRatio), unit:'枚',   tanka:2800,   genka:2150},
+    {cat:'床材',        name:'スーパーハード（2・3F）',basis:'床面積÷1.6562',     qty:Math.round(120*bRatio), unit:'枚',   tanka:1500,   genka:1150},
+    {cat:'床材',        name:'壁下地・床下地',       basis:'部屋数',              qty:h,                      unit:'部屋', tanka:40000,  genka:31000},
+    {cat:'床材',        name:'フローリング',         basis:'1部屋約25㎡×部屋数', qty:Math.round(25*h),       unit:'㎡',   tanka:2200,   genka:1700},
+    {cat:'床材',        name:'クッションフロア',     basis:'1部屋約4㎡×部屋数',  qty:Math.round(4*h),        unit:'㎡',   tanka:3500,   genka:2700},
+    // ── 内装仕上 ──
+    {cat:'内装仕上',    name:'壁クロス',             basis:'壁面約72㎡/部屋×部屋数', qty:Math.round(72*h),   unit:'㎡',   tanka:1100,   genka:820},
+    {cat:'内装仕上',    name:'天井クロス',           basis:'天井約30㎡/部屋×部屋数', qty:Math.round(30*h),   unit:'㎡',   tanka:1100,   genka:820},
+    {cat:'内装仕上',    name:'造作部材',             basis:'部屋数',              qty:h,                      unit:'部屋', tanka:40000,  genka:31000},
+    {cat:'内装仕上',    name:'内部コーキング',       basis:'部屋数',              qty:h,                      unit:'部屋', tanka:20000,  genka:15500},
+    {cat:'内装仕上',    name:'玄関タイル工事',       basis:'部屋数',              qty:h,                      unit:'部屋', tanka:16000,  genka:12400},
+    {cat:'内装仕上',    name:'コートかけ・傘掛け等', basis:'部屋数',              qty:h,                      unit:'部屋', tanka:20000,  genka:15500},
+    {cat:'内装仕上',    name:'リペア',               basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:100000, genka:78000},
+    {cat:'内装仕上',    name:'共用部長尺シート貼り', basis:'共用部+階段㎡×3,500', qty:Math.round(60*hRatio),  unit:'㎡',   tanka:3500,   genka:2700},
+    // ── 建具・サッシ ──
+    {cat:'建具・サッシ',name:'開き戸（D）',          basis:'箇所数',              qty:p.dn,                   unit:'箇所', tanka:19000,  genka:14800},
+    {cat:'建具・サッシ',name:'引き戸（SD）',         basis:'箇所数',              qty:p.sdn,                  unit:'箇所', tanka:27000,  genka:21000},
+    {cat:'建具・サッシ',name:'3本引き戸',            basis:'各室1箇所×部屋数',    qty:h,                      unit:'箇所', tanka:100000, genka:78000},
+    {cat:'建具・サッシ',name:'折れ戸（CL）',         basis:'箇所数',              qty:p.cl,                   unit:'箇所', tanka:25000,  genka:19500},
+    {cat:'建具・サッシ',name:'靴箱',                 basis:'部屋数',              qty:h,                      unit:'箇所', tanka:30000,  genka:23000},
+    {cat:'建具・サッシ',name:'クローゼット枕棚',     basis:'箇所数',              qty:p.cl,                   unit:'箇所', tanka:9000,   genka:7000},
+    {cat:'建具・サッシ',name:'各部屋玄関ドア（防火）',basis:'防火仕様',           qty:h,                      unit:'箇所', tanka:125000, genka:97000},
+    {cat:'建具・サッシ',name:'共用部ドア（防火）',   basis:'オートロック対応防火', qty:1,                      unit:'箇所', tanka:460000, genka:360000},
+    {cat:'建具・サッシ',name:'腰窓（防火）',         basis:'防火仕様',            qty:p.kw,                   unit:'箇所', tanka:75000,  genka:58000},
+    {cat:'建具・サッシ',name:'縦滑り窓（防火）',     basis:'防火仕様',            qty:p.ts,                   unit:'箇所', tanka:55000,  genka:43000},
+    {cat:'建具・サッシ',name:'バルコニー窓（防火）', basis:'各室1箇所×防火仕様',  qty:p.bw,                   unit:'箇所', tanka:160000, genka:124000},
+    {cat:'建具・サッシ',name:'カーテンレール2m',     basis:'腰窓+バルコニー窓',   qty:p.kw+p.bw,              unit:'箇所', tanka:2200,   genka:1700},
+    {cat:'建具・サッシ',name:'カーテンレール1m',     basis:'縦滑り窓',            qty:p.ts,                   unit:'箇所', tanka:1700,   genka:1300},
+    // ── 住設機器 ──
+    {cat:'住設機器',    name:'トイレ',               basis:'箇所数',              qty:p.tl,                   unit:'箇所', tanka:53000,  genka:41000},
+    {cat:'住設機器',    name:'トイレ収納',           basis:'箇所数',              qty:p.tl,                   unit:'箇所', tanka:14000,  genka:10900},
+    {cat:'住設機器',    name:'タオルリング+紙巻器',  basis:'箇所数',              qty:p.tl,                   unit:'箇所', tanka:10000,  genka:7800},
+    {cat:'住設機器',    name:'洗面台W600',           basis:'図面よりW600',        qty:h,                      unit:'箇所', tanka:63000,  genka:49000},
+    {cat:'住設機器',    name:'洗濯パン600サイズ',    basis:'部屋数',              qty:h,                      unit:'箇所', tanka:10000,  genka:7800},
+    {cat:'住設機器',    name:'キッチン1800（対面）', basis:'部屋数',              qty:h,                      unit:'箇所', tanka:190000, genka:148000},
+    {cat:'住設機器',    name:'キッチン配送費',       basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:20000,  genka:20000},
+    {cat:'住設機器',    name:'IHクッキングヒーター', basis:'部屋数',              qty:h,                      unit:'箇所', tanka:54800,  genka:42000},
+    {cat:'住設機器',    name:'ユニットバス1216',     basis:'図面より1216サイズ',  qty:h,                      unit:'箇所', tanka:200000, genka:156000},
+    {cat:'住設機器',    name:'ユニットバス配送費',   basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:22500,  genka:22500},
+    // ── 照明・エアコン ──
+    {cat:'照明・エアコン',name:'照明器具（1LDK）',   basis:'部屋数',              qty:h,                      unit:'部屋', tanka:60000,  genka:46000},
+    {cat:'照明・エアコン',name:'共用部照明',         basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:100000, genka:78000},
+    {cat:'照明・エアコン',name:'外部鉄骨階段',       basis:p.gaidan==='あり'?'あり':'なし', qty:p.gaidan==='あり'?1:0, unit:'棟', tanka:1200000, genka:940000},
+    {cat:'照明・エアコン',name:'外部鉄骨階段塗装',   basis:p.gaidan==='あり'?'あり':'なし', qty:p.gaidan==='あり'?1:0, unit:'棟', tanka:200000, genka:156000},
+    {cat:'照明・エアコン',name:'エアコン2.8kw',      basis:'リビング洋室隣接',    qty:p.ac,                   unit:'台',   tanka:73000,  genka:55000},
+    {cat:'照明・エアコン',name:'エアコン取付費',     basis:'台数',                qty:p.ac,                   unit:'台',   tanka:40000,  genka:31000},
+    // ── 外装・屋根 ──
+    {cat:'外装・屋根',  name:'屋根工事',             basis:'建築面積（㎡）',      qty:p.km,                   unit:'㎡',   tanka:8800,   genka:6800},
+    {cat:'外装・屋根',  name:'外壁工事',             basis:'外壁面積概算',        qty:Math.round(700*bRatio), unit:'㎡',   tanka:6500,   genka:5000},
+    {cat:'外装・屋根',  name:'軒天材',               basis:'軒天面積÷2.7573',     qty:Math.round(20*bRatio),  unit:'㎡',   tanka:5210,   genka:4000},
+    {cat:'外装・屋根',  name:'基礎左官',             basis:'外周長さ',            qty:p.gm,                   unit:'m',    tanka:1300,   genka:1000},
+    // ── セキュリティ ──
+    {cat:'セキュリティ',name:'オートロック',         basis:p.autolock==='あり'?'あり':'なし', qty:p.autolock==='あり'?1:0, unit:'棟', tanka:275000, genka:214000},
+    {cat:'セキュリティ',name:'インターホン（対応）', basis:'オートロック対応',    qty:h,                      unit:'部屋', tanka:30000,  genka:23400},
+    {cat:'セキュリティ',name:'サイン工事',           basis:'1棟固定',             qty:1,                      unit:'棟',   tanka:200000, genka:156000},
+  ];
+
+  if (p.maizo) {
+    rows.push({cat:'特殊仕様', name:'GRRシート工法（埋蔵文化財対応）', basis:'埋蔵文化財包蔵地', qty:p.bm, unit:'坪', tanka:15000, genka:11700});
+  }
+
+  // 掛け率で客出し単価を計算
+  // genkaをMASTERから上書き（localStorage保存値を反映）
+  const rate = (1 + p.kanri) * (1 + p.ippan) * (1 + p.rieki);
+  const computed = rows.map(r => {
+    const masterItem = MASTER.find(m => m.cat === r.cat && m.name === r.name);
+    const genka = masterItem ? masterItem.genka : (r.genka || 0);
+    const tanka = Math.ceil((genka * rate) / 100) * 100;
+    const qty   = Math.round((r.qty||0)*100)/100;
+    return {
+      ...r,
+      genka,
+      tanka,
+      qty,
+      kin:  Math.round(qty * tanka),
+      gkin: Math.round(qty * genka),
+    };
+  });
+
+  const chokku  = computed.reduce((s,r)=>s+r.kin,0);
+  const gChokku = computed.reduce((s,r)=>s+r.gkin,0);
+  return { rows: computed, chokku, gChokku, rate };
+}
+
+// ════════════════════════════════════════
+// STEP 3: 見積表示
+// ════════════════════════════════════════
+function renderEstimate() {
+  const p = getParams();
+  const { rows, chokku, gChokku, rate } = calcEstimate(p);
+  S.estimate = { rows, chokku, gChokku, p, rate };
+
+  const fmt = n => Math.round(n).toLocaleString('ja-JP');
+  const tax = Math.round(chokku * 0.1);
+  const total = chokku + tax;
+
+  document.getElementById('total-propname').textContent = p.name || '物件名未設定';
+  document.getElementById('total-zei').textContent = '¥ ' + fmt(total);
+  document.getElementById('total-sub').textContent = `税抜 ¥${fmt(chokku)} ／ 消費税10% ¥${fmt(tax)}`;
+  document.getElementById('tsubo-tanka').textContent = '¥' + fmt(Math.round(chokku/Math.max(p.nb,1))) + '/坪';
+  document.getElementById('hebe-tanka').textContent  = '¥' + fmt(Math.round(chokku/Math.max(p.nb*3.30579,1))) + '/㎡';
+  document.getElementById('ko-tanka').textContent    = '¥' + fmt(Math.round(chokku/Math.max(p.heya,1)));
+
+  // 原価サマリーボックス更新
+  const isG = S.mode === 'genka';
+  const gsBox = document.getElementById('genka-summary-box');
+  gsBox.style.display = isG ? 'block' : 'none';
+  if (isG) {
+    const arari = chokku - gChokku;
+    const arariPct = chokku > 0 ? (arari/chokku*100).toFixed(1) : '0.0';
+    document.getElementById('gs-mitsu').textContent  = '¥' + fmt(chokku);
+    document.getElementById('gs-genka').textContent  = '¥' + fmt(gChokku);
+    document.getElementById('gs-arari').textContent  = '¥' + fmt(arari);
+    document.getElementById('gs-arari-pct').textContent = arariPct + '%';
+    // 掛け率情報
+    const rateEl = document.getElementById('gs-rate');
+    if (rateEl) rateEl.textContent = `掛け率 ${rate.toFixed(3)}倍（管理${(p.kanri*100).toFixed(1)}% × 一般${(p.ippan*100).toFixed(1)}% × 利益${(p.rieki*100).toFixed(1)}%）`;
+  }
+
+  // テーブル描画
+  let html = '', no = 0, lastCat = '';
+
+  for (const r of rows) {
+    if (r.cat !== lastCat) {
+      html += `<tr class="est-cat-row"><td colspan="${isG?10:8}">▼ ${r.cat}</td></tr>`;
+      lastCat = r.cat;
+    }
+    no++;
+    const margin = r.kin - r.gkin;
+    const marginPct = r.kin > 0 ? (margin/r.kin*100).toFixed(1) : '0.0';
+    const mCls = margin >= 0 ? 'margin-pos' : 'margin-neg';
+
+    html += `<tr>
+      <td>${no}</td>
+      <td style="font-size:10px;color:var(--gray4);">${r.cat}</td>
+      <td>${r.name}</td>
+      <td style="font-size:11px;color:var(--gray4);">${r.basis}</td>
+      <td class="r">${r.qty.toLocaleString()}</td>
+      <td style="text-align:center;font-size:11px;">${r.unit}</td>
+      <td class="r">¥${fmt(r.tanka)}</td>
+      <td class="amt">¥${fmt(r.kin)}</td>
+      ${isG ? `<td class="r"><input class="genka-input" value="${fmt(r.genka)}" onchange="updateGenka(${no-1},this.value)">／${r.unit}</td>` : ''}
+      ${isG ? `<td class="r"><span class="${mCls}">¥${fmt(margin)}</span><br><span style="font-size:10px;color:var(--gray3);">${marginPct}%</span></td>` : ''}
+    </tr>`;
+  }
+
+  document.getElementById('est-body').innerHTML = html;
+
+  // フッター
+  const arari = chokku - gChokku;
+  const arariPct = chokku > 0 ? (arari/chokku*100).toFixed(1) : '0.0';
+  const cols = isG ? 10 : 8;
+  let foot = `
+    <tr style="background:var(--gray1);font-weight:700;">
+      <td colspan="6"></td>
+      <td style="font-size:12px;font-weight:700;padding:10px;white-space:nowrap;">直工費合計（税抜）</td>
+      <td class="amt" style="padding:10px;">¥${fmt(chokku)}</td>
+      ${isG?`<td class="r" style="padding:10px;color:var(--amber);font-weight:700;">¥${fmt(gChokku)}</td>
+             <td class="r" style="padding:10px;"><span class="margin-pos" style="font-size:13px;">¥${fmt(arari)}</span><br><span style="font-size:11px;color:var(--green);font-weight:700;">${arariPct}%</span></td>`:''}
+    </tr>
+    <tr style="background:var(--gray1);">
+      <td colspan="6"></td>
+      <td style="padding:8px;font-size:12px;">消費税（10%）</td>
+      <td class="amt" style="padding:8px;">¥${fmt(tax)}</td>
+      ${isG?'<td></td><td></td>':''}
+    </tr>
+    <tr style="background:var(--navy);">
+      <td colspan="6"></td>
+      <td style="padding:12px;font-size:13px;font-weight:900;color:white;white-space:nowrap;">合計（税込）</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:900;color:white;padding:12px;">¥${fmt(total)}</td>
+      ${isG?`<td style="text-align:right;padding:12px;color:rgba(255,200,100,.9);font-size:12px;">原価<br>¥${fmt(gChokku)}</td>
+             <td style="text-align:right;padding:12px;color:#4aba6a;font-size:12px;">粗利<br>¥${fmt(arari)} / <strong>${arariPct}%</strong></td>`:''}
+    </tr>`;
+  document.getElementById('est-foot').innerHTML = foot;
+}
+
+function updateGenka(idx, val) {
+  // 原価入力の更新（リアルタイム粗利計算）
+  const num = parseInt(val.replace(/,/g,'')) || 0;
+  if (S.estimate && S.estimate.rows[idx]) {
+    S.estimate.rows[idx].genka = num;
+    S.estimate.rows[idx].gkin = Math.round(S.estimate.rows[idx].qty * num);
+  }
+}
+
+// ════════════════════════════════════════
+// STEP 4: 出力
+// ════════════════════════════════════════
+function renderOutputPreview() {
+  if (!S.estimate) return;
+  const p = S.estimate.p;
+  const fmt = n => Math.round(n).toLocaleString('ja-JP');
+  const total = Math.round(S.estimate.chokku * 1.1);
+
+  document.getElementById('output-preview').innerHTML = `
+    <div class="g2">
+      ${[
+        ['物件名',p.name||'（未設定）'],
+        ['所在地',p.address||'（未設定）'],
+        ['構造',`木造${p.kaisu}階建て　${p.madori}×${p.heya}戸`],
+        ['延床面積',`${(p.nb*3.30579).toFixed(1)}㎡（${p.nb}坪）`],
+        ['見積金額（税抜）','¥ '+fmt(S.estimate.chokku)],
+        ['見積金額（税込）','¥ '+fmt(total)],
+        ['坪単価','¥ '+fmt(Math.round(S.estimate.chokku/Math.max(p.nb,1)))+' /坪'],
+        ['作成日',new Date().toLocaleDateString('ja-JP')],
+      ].map(([k,v])=>`<div style="padding:8px 0;border-bottom:1px solid var(--gray1);">
+        <div style="font-size:11px;color:var(--gray4);">${k}</div>
+        <div style="font-size:14px;font-weight:700;margin-top:2px;">${v}</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+function doExcel() {
+  if (!S.estimate) { toast('先に見積を作成してください'); return; }
+  const p = S.estimate.p;
+  const rows = S.estimate.rows;
+  const chokku = S.estimate.chokku;
+  const tax = Math.round(chokku * 0.1);
+  const total = chokku + tax;
+  const fmt = n => Math.round(n).toLocaleString('ja-JP');
+  const d = new Date().toLocaleDateString('ja-JP');
+
+  // TSV形式でExcelに貼り付けられるデータを生成
+  // Blob + download でxls互換のHTMLテーブルを出力
+  let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head><meta charset="UTF-8">
+<style>
+  body{font-family:'Noto Sans JP',sans-serif;}
+  table{border-collapse:collapse;width:100%;}
+  th,td{border:1px solid #ccc;padding:5px 8px;font-size:11px;}
+  .hd{background:#1a2744;color:white;font-weight:bold;}
+  .cat{background:#eef2fc;font-weight:bold;color:#1a2744;}
+  .total{background:#1a2744;color:white;font-weight:bold;font-size:13px;}
+  .sub{background:#f0ede6;}
+  .r{text-align:right;}
+</style>
+</head><body>
+
+<h2 style="font-size:18px;border-left:4px solid #1a2744;padding-left:12px;">新　築　工　事　見　積　書</h2>
+<table style="width:500px;margin-bottom:20px;border:none;">
+<tr><td style="border:none;width:120px;color:#7a7568;font-size:11px;">物件名</td><td style="border:none;font-weight:bold;">${p.name||'　'}</td></tr>
+<tr><td style="border:none;color:#7a7568;font-size:11px;">所在地</td><td style="border:none;">${p.address||'　'}</td></tr>
+<tr><td style="border:none;color:#7a7568;font-size:11px;">構造・規模</td><td style="border:none;">木造${p.kaisu}階建て　${p.madori}×${p.heya}戸　延床${(p.nb*3.30579).toFixed(1)}㎡</td></tr>
+<tr><td style="border:none;color:#7a7568;font-size:11px;">見積日</td><td style="border:none;">${d}</td></tr>
+<tr><td style="border:none;color:#7a7568;font-size:11px;">有効期限</td><td style="border:none;">上記見積日より30日間</td></tr>
+</table>
+
+<table style="width:300px;margin-bottom:24px;border:2px solid #1a2744;">
+<tr><td style="padding:10px;font-size:12px;font-weight:bold;background:#f5f3ee;">見積金額（税込）</td>
+<td style="padding:10px;font-size:18px;font-weight:900;text-align:right;background:#f5f3ee;">¥ ${fmt(total)}</td></tr>
+</table>
+
+<h3 style="font-size:13px;margin-bottom:8px;">【内訳明細】</h3>
+<table>
+<tr>
+  <th class="hd" style="width:30px;">No</th>
+  <th class="hd" style="width:100px;">工種</th>
+  <th class="hd" style="width:180px;">項目</th>
+  <th class="hd" style="width:140px;">算出根拠</th>
+  <th class="hd r" style="width:70px;">数量</th>
+  <th class="hd" style="width:50px;">単位</th>
+  <th class="hd r" style="width:90px;">単価（円）</th>
+  <th class="hd r" style="width:100px;">金額（円）</th>
+</tr>`;
+
+  let no = 0, lastCat = '';
+  for (const r of rows) {
+    if (r.cat !== lastCat) {
+      html += `<tr><td class="cat" colspan="8">▼ ${r.cat}</td></tr>`;
+      lastCat = r.cat;
+    }
+    no++;
+    html += `<tr>
+      <td class="r">${no}</td>
+      <td style="font-size:10px;color:#7a7568;">${r.cat}</td>
+      <td>${r.name}</td>
+      <td style="font-size:10px;color:#7a7568;">${r.basis}</td>
+      <td class="r">${r.qty.toLocaleString()}</td>
+      <td style="text-align:center;">${r.unit}</td>
+      <td class="r">¥${fmt(r.tanka)}</td>
+      <td class="r">¥${fmt(r.kin)}</td>
+    </tr>`;
+  }
+
+  html += `
+<tr class="sub"><td colspan="7" class="r" style="font-weight:bold;padding:8px;">直接工事費合計（税抜）</td><td class="r" style="font-weight:bold;padding:8px;">¥${fmt(chokku)}</td></tr>
+<tr class="sub"><td colspan="7" class="r" style="padding:6px;">消費税（10%）</td><td class="r" style="padding:6px;">¥${fmt(tax)}</td></tr>
+<tr class="total"><td colspan="7" class="r" style="padding:10px;font-size:13px;">合計（税込）</td><td class="r" style="padding:10px;font-size:15px;">¥${fmt(total)}</td></tr>
+</table>
+
+<p style="font-size:10px;color:#b8b4a8;margin-top:16px;border-top:1px solid #e0ddd4;padding-top:10px;">
+  ${p.name||''} ／ 作成：${d} ／ 作成者：創世建設株式会社
+</p>
+</body></html>`;
+
+  const blob = new Blob([html], {type: 'application/vnd.ms-excel;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `見積書_${p.name||'物件名未設定'}_${d.replace(/\//g,'')}.xls`;
+  a.click();
+  toast('📊 Excelファイルをダウンロードしました');
+}
+
+function doPrint() {
+  if (!S.estimate) { toast('先に見積を作成してください'); return; }
+  // 印刷用ページを別ウィンドウで開く
+  const p = S.estimate.p;
+  const rows = S.estimate.rows;
+  const chokku = S.estimate.chokku;
+  const tax = Math.round(chokku * 0.1);
+  const total = chokku + tax;
+  const fmt = n => Math.round(n).toLocaleString('ja-JP');
+  const d = new Date().toLocaleDateString('ja-JP');
+
+  let trs = '', no = 0, lastCat = '';
+  for (const r of rows) {
+    if (r.cat !== lastCat) {
+      trs += `<tr style="background:#eef2fc;"><td colspan="7" style="font-weight:bold;color:#1a2744;padding:6px 8px;font-size:11px;">▼ ${r.cat}</td></tr>`;
+      lastCat = r.cat;
+    }
+    no++;
+    trs += `<tr><td style="text-align:right;">${no}</td><td style="color:#7a7568;font-size:10px;">${r.cat}</td><td>${r.name}</td><td style="color:#7a7568;font-size:10px;">${r.basis}</td><td style="text-align:right;">${r.qty.toLocaleString()}</td><td style="text-align:center;">${r.unit}</td><td style="text-align:right;font-weight:600;">¥${fmt(r.kin)}</td></tr>`;
+  }
+
+  const printHtml = `<!DOCTYPE html><html lang="ja"><head>
+<meta charset="UTF-8"><title>見積書 - ${p.name||''}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;padding:24px 32px;color:#16140f;font-size:12px;}
+h1{font-size:20px;font-weight:900;border-left:4px solid #1a2744;padding-left:12px;margin-bottom:16px;}
+.meta-table{width:100%;margin-bottom:20px;}
+.meta-table td{padding:4px 8px;font-size:12px;}
+.meta-table .lbl{color:#7a7568;width:100px;}
+.amount-box{background:#1a2744;color:white;padding:12px 20px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;}
+.ab-label{font-size:11px;opacity:.6;}
+.ab-value{font-size:22px;font-weight:900;}
+table{width:100%;border-collapse:collapse;}
+th{background:#1a2744;color:white;padding:7px 8px;text-align:left;font-size:11px;}
+th.r{text-align:right;}
+td{padding:6px 8px;border-bottom:1px solid #e0ddd4;}
+td.r{text-align:right;}
+.foot-row td{background:#f0ede6;font-weight:bold;padding:8px;}
+.total-row td{background:#1a2744;color:white;font-weight:900;font-size:14px;padding:10px;}
+.note{font-size:9px;color:#b8b4a8;margin-top:16px;border-top:1px solid #e0ddd4;padding-top:10px;}
+@media print{body{padding:10mm 14mm;}}
+</style></head><body>
+<h1>新　築　工　事　見　積　書</h1>
+<table class="meta-table">
+<tr><td class="lbl">物件名</td><td><strong>${p.name||'　'}</strong></td><td class="lbl">作成日</td><td>${d}</td></tr>
+<tr><td class="lbl">所在地</td><td>${p.address||'　'}</td><td class="lbl">有効期限</td><td>30日間</td></tr>
+<tr><td class="lbl">構造・規模</td><td>木造${p.kaisu}階建て　${p.madori}×${p.heya}戸　延床${(p.nb*3.30579).toFixed(1)}㎡（${p.nb}坪）</td><td colspan="2"></td></tr>
+</table>
+<div class="amount-box">
+  <div><div class="ab-label">見積金額（税込）</div><div class="ab-value">¥ ${fmt(total)}</div></div>
+  <div style="text-align:right;opacity:.7;font-size:11px;">
+    税抜 ¥${fmt(chokku)}<br>消費税 ¥${fmt(tax)}<br>坪単価 ¥${fmt(Math.round(chokku/Math.max(p.nb,1)))}
+  </div>
+</div>
+<table>
+<thead><tr><th>No</th><th>工種</th><th>項目</th><th>算出根拠</th><th class="r">数量</th><th>単位</th><th class="r">金額（円）</th></tr></thead>
+<tbody>${trs}</tbody>
+<tfoot>
+<tr class="foot-row"><td colspan="6" class="r">直接工事費合計（税抜）</td><td class="r">¥${fmt(chokku)}</td></tr>
+<tr class="foot-row"><td colspan="6" class="r">消費税（10%）</td><td class="r">¥${fmt(tax)}</td></tr>
+<tr class="total-row"><td colspan="6" class="r">合計（税込）</td><td class="r">¥${fmt(total)}</td></tr>
+</tfoot>
+</table>
+<div class="note">
+  本見積書は概算です。建築確認申請・実施設計図面確定後に詳細見積を提出します。<br>
+  作成：創世建設株式会社 ／ ${d}
+</div>
+<script>window.onload=()=>window.print();<\/script>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(printHtml);
+  w.document.close();
+  toast('🖨️ 印刷プレビューを開きました');
+}
+
+function doSaveJson() {
+  if (!S.estimate) { toast('先に見積を作成してください'); return; }
+  const saveData = {
+    version: VERSION,
+    savedAt: new Date().toISOString(),
+    params: S.estimate.p,
+    zoning: S.zoning,
+    specFlags: S.specFlags,
+  };
+  const blob = new Blob([JSON.stringify(saveData, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `見積案件_${S.estimate.p.name||'未設定'}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  toast('💾 案件データを保存しました');
+}
+
+function loadJson(input) {
+  const f = input.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.params) {
+        // フォームに値を反映
+        const p = data.params;
+        const setV = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; };
+        setV('prop-name', p.name); setV('prop-address', p.address);
+        setV('s-kozo', p.kozo); setV('s-kaisu', p.kaisu); setV('s-heya', p.heya);
+        setV('s-madori', p.madori); setV('s-gas', p.gas); setV('s-jiban', p.jiban);
+        setV('s-gaidan', p.gaidan); setV('s-autolock', p.autolock);
+        setV('s-bm', p.bm); setV('s-ik', p.ik); setV('s-nb', p.nb);
+        setV('s-gm', p.gm); setV('s-km', p.km); setV('s-bl', p.bl); setV('s-ky', p.ky);
+        setV('s-kw', p.kw); setV('s-ts', p.ts); setV('s-bw', p.bw);
+        setV('s-cl', p.cl); setV('s-dn', p.dn); setV('s-sdn', p.sdn);
+        setV('s-tl', p.tl); setV('s-ac', p.ac);
+        // 掛け率設定の復元
+        if (p.kanri !== undefined) setV('r-kanri', Math.round(p.kanri*100));
+        if (p.ippan !== undefined) setV('r-ippan', Math.round(p.ippan*100));
+        if (p.rieki !== undefined) setV('r-rieki', Math.round(p.rieki*100));
+      }
+      if (data.specFlags) { S.specFlags = data.specFlags; updateAlerts(); }
+      if (data.zoning) { S.zoning = data.zoning; showZoningResult(data.zoning); document.getElementById('zone-result-area').style.display='block'; }
+      recalc();
+      toast('📂 案件データを読み込みました（v' + (data.version||'?') + '）');
+    } catch(e) { toast('読み込みに失敗しました'); }
+  };
+  reader.readAsText(f);
+}
+
+function clearAll() {
+  if (!confirm('全データをリセットします。よろしいですか？')) return;
+  location.reload();
+}
+
+// ════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════
+function setStatus(type, text) {
+  document.getElementById('tb-pulse').className = 'tb-pulse' + (type==='loading'?' loading':type==='err'?' err':'');
+  document.getElementById('tb-status').textContent = text;
+}
+
+function showOverlay(title, sub) {
+  document.getElementById('ao-title').textContent = title;
+  document.getElementById('ao-sub').textContent = sub;
+  document.getElementById('ai-overlay').classList.add('show');
+}
+
+function hideOverlay() {
+  document.getElementById('ai-overlay').classList.remove('show');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ════════════════════════════════════════
+// 単価マスター管理（localStorage永続化）
+// ════════════════════════════════════════
+const MASTER_KEY = 'estimate_genka_master_v1';
+
+// デフォルト原価マスター（calcEstimateと同期）
+const DEFAULT_MASTER = [
+  {cat:'仮設・共通',   name:'仮設足場',              unit:'㎡',   genka:620},
+  {cat:'仮設・共通',   name:'共通仮設費用',           unit:'式',   genka:380000},
+  {cat:'仮設・共通',   name:'完成後クリーニング',     unit:'㎡',   genka:300},
+  {cat:'仮設・共通',   name:'外部借上駐車場',         unit:'式',   genka:800000},
+  {cat:'仮設・共通',   name:'産廃',                   unit:'坪',   genka:7000},
+  {cat:'基礎・地盤',   name:'基礎工事（3階建）',      unit:'坪',   genka:62000},
+  {cat:'基礎・地盤',   name:'地盤改良',               unit:'式',   genka:1200000},
+  {cat:'構造・木工事', name:'建て方（在来）',          unit:'坪',   genka:8000},
+  {cat:'構造・木工事', name:'木材（在来）',            unit:'坪',   genka:58000},
+  {cat:'構造・木工事', name:'防水材・点検口',          unit:'式',   genka:230000},
+  {cat:'構造・木工事', name:'内部造作（在来）',        unit:'坪',   genka:24000},
+  {cat:'構造・木工事', name:'共用部造作',              unit:'式',   genka:380000},
+  {cat:'設備',         name:'換気材',                  unit:'部屋', genka:14000},
+  {cat:'設備',         name:'電気配線工事',            unit:'部屋', genka:280000},
+  {cat:'設備',         name:'給排水工事',              unit:'部屋', genka:390000},
+  {cat:'設備',         name:'室外物干し',              unit:'部屋', genka:7200},
+  {cat:'設備',         name:'室内物干し',              unit:'部屋', genka:5000},
+  {cat:'設備',         name:'火災報知器',              unit:'部屋', genka:3000},
+  {cat:'設備',         name:'非常照明・消火器等',      unit:'式',   genka:78000},
+  {cat:'設備',         name:'給湯器',                  unit:'部屋', genka:48000},
+  {cat:'設備',         name:'ガス工事（プロパン）',    unit:'部屋', genka:26000},
+  {cat:'設備',         name:'ガス工事（都市ガス）',    unit:'部屋', genka:130000},
+  {cat:'断熱材',       name:'各階外周部断熱材',        unit:'本',   genka:4000},
+  {cat:'断熱材',       name:'界壁断熱材',              unit:'本',   genka:5000},
+  {cat:'断熱材',       name:'各階天井断熱材',          unit:'本',   genka:4000},
+  {cat:'石膏ボード',   name:'外周部石膏ボード（3F）',  unit:'枚',   genka:1150},
+  {cat:'石膏ボード',   name:'界壁石膏ボード',          unit:'枚',   genka:560},
+  {cat:'石膏ボード',   name:'1F天井石膏ボード（3F）',  unit:'枚',   genka:850},
+  {cat:'石膏ボード',   name:'2F天井石膏ボード（3F）',  unit:'枚',   genka:850},
+  {cat:'石膏ボード',   name:'3F天井石膏ボード',        unit:'枚',   genka:420},
+  {cat:'石膏ボード',   name:'間仕切り石膏ボード（3F）',unit:'枚',   genka:1150},
+  {cat:'石膏ボード',   name:'遮音シート',              unit:'本',   genka:2050},
+  {cat:'床材',         name:'ユカテック（2・3F）',     unit:'枚',   genka:2150},
+  {cat:'床材',         name:'スーパーハード（2・3F）', unit:'枚',   genka:1150},
+  {cat:'床材',         name:'壁下地・床下地',          unit:'部屋', genka:31000},
+  {cat:'床材',         name:'フローリング',            unit:'㎡',   genka:1700},
+  {cat:'床材',         name:'クッションフロア',        unit:'㎡',   genka:2700},
+  {cat:'内装仕上',     name:'壁クロス',                unit:'㎡',   genka:820},
+  {cat:'内装仕上',     name:'天井クロス',              unit:'㎡',   genka:820},
+  {cat:'内装仕上',     name:'造作部材',                unit:'部屋', genka:31000},
+  {cat:'内装仕上',     name:'内部コーキング',          unit:'部屋', genka:15500},
+  {cat:'内装仕上',     name:'玄関タイル工事',          unit:'部屋', genka:12400},
+  {cat:'内装仕上',     name:'コートかけ・傘掛け等',    unit:'部屋', genka:15500},
+  {cat:'内装仕上',     name:'リペア',                  unit:'棟',   genka:78000},
+  {cat:'内装仕上',     name:'共用部長尺シート貼り',    unit:'㎡',   genka:2700},
+  {cat:'建具・サッシ', name:'開き戸（D）',             unit:'箇所', genka:14800},
+  {cat:'建具・サッシ', name:'引き戸（SD）',            unit:'箇所', genka:21000},
+  {cat:'建具・サッシ', name:'3本引き戸',               unit:'箇所', genka:78000},
+  {cat:'建具・サッシ', name:'折れ戸（CL）',            unit:'箇所', genka:19500},
+  {cat:'建具・サッシ', name:'靴箱',                    unit:'箇所', genka:23000},
+  {cat:'建具・サッシ', name:'クローゼット枕棚',        unit:'箇所', genka:7000},
+  {cat:'建具・サッシ', name:'各部屋玄関ドア（防火）',  unit:'箇所', genka:97000},
+  {cat:'建具・サッシ', name:'共用部ドア（防火）',      unit:'箇所', genka:360000},
+  {cat:'建具・サッシ', name:'腰窓（防火）',            unit:'箇所', genka:58000},
+  {cat:'建具・サッシ', name:'縦滑り窓（防火）',        unit:'箇所', genka:43000},
+  {cat:'建具・サッシ', name:'バルコニー窓（防火）',    unit:'箇所', genka:124000},
+  {cat:'建具・サッシ', name:'カーテンレール2m',        unit:'箇所', genka:1700},
+  {cat:'建具・サッシ', name:'カーテンレール1m',        unit:'箇所', genka:1300},
+  {cat:'住設機器',     name:'トイレ',                  unit:'箇所', genka:41000},
+  {cat:'住設機器',     name:'トイレ収納',              unit:'箇所', genka:10900},
+  {cat:'住設機器',     name:'タオルリング+紙巻器',     unit:'箇所', genka:7800},
+  {cat:'住設機器',     name:'洗面台W600',              unit:'箇所', genka:49000},
+  {cat:'住設機器',     name:'洗濯パン600サイズ',       unit:'箇所', genka:7800},
+  {cat:'住設機器',     name:'キッチン1800（対面）',    unit:'箇所', genka:148000},
+  {cat:'住設機器',     name:'キッチン配送費',          unit:'棟',   genka:20000},
+  {cat:'住設機器',     name:'IHクッキングヒーター',    unit:'箇所', genka:42000},
+  {cat:'住設機器',     name:'ユニットバス1216',        unit:'箇所', genka:156000},
+  {cat:'住設機器',     name:'ユニットバス配送費',      unit:'棟',   genka:22500},
+  {cat:'照明・エアコン',name:'照明器具（1LDK）',       unit:'部屋', genka:46000},
+  {cat:'照明・エアコン',name:'共用部照明',             unit:'棟',   genka:78000},
+  {cat:'照明・エアコン',name:'外部鉄骨階段',           unit:'棟',   genka:940000},
+  {cat:'照明・エアコン',name:'外部鉄骨階段塗装',       unit:'棟',   genka:156000},
+  {cat:'照明・エアコン',name:'エアコン2.8kw',          unit:'台',   genka:55000},
+  {cat:'照明・エアコン',name:'エアコン取付費',         unit:'台',   genka:31000},
+  {cat:'外装・屋根',   name:'屋根工事',                unit:'㎡',   genka:6800},
+  {cat:'外装・屋根',   name:'外壁工事',                unit:'㎡',   genka:5000},
+  {cat:'外装・屋根',   name:'軒天材',                  unit:'㎡',   genka:4000},
+  {cat:'外装・屋根',   name:'基礎左官',                unit:'m',    genka:1000},
+  {cat:'セキュリティ', name:'オートロック',             unit:'棟',   genka:214000},
+  {cat:'セキュリティ', name:'インターホン（対応）',     unit:'部屋', genka:23400},
+  {cat:'セキュリティ', name:'サイン工事',              unit:'棟',   genka:156000},
+  {cat:'特殊仕様',     name:'GRRシート工法（埋蔵文化財対応）', unit:'坪', genka:11700},
+];
+
+// 現在のマスターデータ（起動時にlocalStorageから復元）
+let MASTER = JSON.parse(JSON.stringify(DEFAULT_MASTER));
+
+function loadMasterFromStorage() {
+  try {
+    const saved = localStorage.getItem(MASTER_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      if (data.items && Array.isArray(data.items)) {
+        // 保存済みデータをDEFAULT_MASTERにマージ（新項目は追加、既存は上書き）
+        MASTER = DEFAULT_MASTER.map(def => {
+          const saved_item = data.items.find(s => s.name === def.name && s.cat === def.cat);
+          return saved_item ? {...def, genka: saved_item.genka} : def;
+        });
+        const el = document.getElementById('master-saved-at');
+        if (el) el.textContent = '最終保存: ' + new Date(data.savedAt).toLocaleString('ja-JP');
+      }
+    }
+  } catch(e) { console.warn('マスター読込エラー', e); }
+}
+
+function saveMaster() {
+  // テーブルの入力値を収集
+  const rows = document.querySelectorAll('#master-body tr[data-idx]');
+  rows.forEach(tr => {
+    const idx = parseInt(tr.dataset.idx);
+    const inp = tr.querySelector('.master-genka-input');
+    if (inp && MASTER[idx]) {
+      MASTER[idx].genka = parseInt(inp.value.replace(/,/g,'')) || MASTER[idx].genka;
+    }
+  });
+  const saveData = { savedAt: new Date().toISOString(), version: VERSION, items: MASTER };
+  localStorage.setItem(MASTER_KEY, JSON.stringify(saveData));
+  const el = document.getElementById('master-saved-at');
+  if (el) el.textContent = '最終保存: ' + new Date().toLocaleString('ja-JP');
+  toast('💾 単価マスターを保存しました');
+  renderMasterTable(); // 表示更新
+}
+
+function resetMaster() {
+  if (!confirm('単価マスターを初期値に戻します。よろしいですか？')) return;
+  localStorage.removeItem(MASTER_KEY);
+  MASTER = JSON.parse(JSON.stringify(DEFAULT_MASTER));
+  renderMasterTable();
+  toast('↩️ 初期値に戻しました');
+}
+
+function exportMasterJson() {
+  const data = { savedAt: new Date().toISOString(), version: VERSION, items: MASTER };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `単価マスター_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  toast('📤 単価マスターをエクスポートしました');
+}
+
+function importMasterJson(input) {
+  const f = input.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.items && Array.isArray(data.items)) {
+        MASTER = DEFAULT_MASTER.map(def => {
+          const imp = data.items.find(s => s.name === def.name && s.cat === def.cat);
+          return imp ? {...def, genka: imp.genka} : def;
+        });
+        renderMasterTable();
+        toast('📥 単価マスターをインポートしました');
+      }
+    } catch(e) { toast('読込に失敗しました'); }
+  };
+  reader.readAsText(f);
+}
+
+function getMasterGenka(cat, name) {
+  const item = MASTER.find(m => m.cat === cat && m.name === name);
+  return item ? item.genka : null;
+}
+
+function renderMasterTable() {
+  const kanri = parseFloat(document.getElementById('r-kanri')?.value || 8) / 100;
+  const ippan = parseFloat(document.getElementById('r-ippan')?.value || 5) / 100;
+  const rieki = parseFloat(document.getElementById('r-rieki')?.value || 10) / 100;
+  const rate  = (1 + kanri) * (1 + ippan) * (1 + rieki);
+  const fmt   = n => Math.round(n).toLocaleString('ja-JP');
+
+  const tbody = document.getElementById('master-body');
+  if (!tbody) return;
+
+  let html = '', lastCat = '';
+  MASTER.forEach((item, idx) => {
+    if (item.cat !== lastCat) {
+      html += `<tr style="background:var(--navy-light);"><td colspan="6" style="font-weight:700;color:var(--navy);font-size:11px;padding:6px 10px;">▼ ${item.cat}</td></tr>`;
+      lastCat = item.cat;
+    }
+    const tanka = Math.ceil((item.genka * rate) / 100) * 100;
+    const isChanged = item.genka !== DEFAULT_MASTER[idx]?.genka;
+    html += `<tr data-idx="${idx}" style="background:${isChanged?'var(--amber-bg)':''}">
+      <td style="text-align:right;color:var(--gray4);">${idx+1}</td>
+      <td style="font-size:11px;color:var(--gray4);">${item.cat}</td>
+      <td>${item.name}${isChanged?'<span style="font-size:9px;color:var(--amber);margin-left:4px;">●変更済</span>':''}</td>
+      <td style="text-align:right;">
+        <input class="master-genka-input"
+          style="width:100px;font-size:12px;padding:4px 8px;border:1px solid ${isChanged?'var(--amber)':'var(--gray2)'};border-radius:4px;text-align:right;font-family:'JetBrains Mono',monospace;background:${isChanged?'var(--amber-bg)':'var(--white)'};"
+          value="${fmt(item.genka)}"
+          onchange="updateMasterRow(${idx}, this.value)"
+          onfocus="this.select()">
+      </td>
+      <td style="text-align:center;font-size:11px;">${item.unit}</td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--navy);font-weight:600;">¥${fmt(tanka)}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function updateMasterRow(idx, val) {
+  const num = parseInt(val.replace(/,/g,'')) || 0;
+  if (MASTER[idx]) MASTER[idx].genka = num;
+  // 掛け後単価をリアルタイム更新
+  const kanri = parseFloat(document.getElementById('r-kanri')?.value || 8) / 100;
+  const ippan = parseFloat(document.getElementById('r-ippan')?.value || 5) / 100;
+  const rieki = parseFloat(document.getElementById('r-rieki')?.value || 10) / 100;
+  const rate  = (1 + kanri) * (1 + ippan) * (1 + rieki);
+  const tanka = Math.ceil((num * rate) / 100) * 100;
+  const tr = document.querySelector(`#master-body tr[data-idx="${idx}"]`);
+  if (tr) {
+    tr.cells[5].textContent = '¥' + Math.round(tanka).toLocaleString('ja-JP');
+    tr.cells[3].querySelector('input').style.borderColor = 'var(--amber)';
+    tr.cells[3].querySelector('input').style.background = 'var(--amber-bg)';
+    tr.style.background = 'var(--amber-bg)';
+  }
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+recalc();
+loadMasterFromStorage();
+</script>
+</body>
+</html>
